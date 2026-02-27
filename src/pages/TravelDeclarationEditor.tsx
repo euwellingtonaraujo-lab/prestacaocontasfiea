@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { expenses, travelDeclarations, formatCurrency, formatDate } from '@/data/mockData';
+import { expenses, travelDeclarations, formatCurrency, formatDate, Traveler } from '@/data/mockData';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Check, Download, Upload, X, Plane } from 'lucide-react';
+import { Save, Check, Download, Upload, X, Plane, Plus, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TravelDeclarationEditor = () => {
@@ -29,6 +29,7 @@ const TravelDeclarationEditor = () => {
     new Set(existing?.expenseIds || [])
   );
   const [attachments, setAttachments] = useState<string[]>(existing?.attachments || []);
+  const [travelers, setTravelers] = useState<Traveler[]>(existing?.travelers || []);
 
   const travelExpenses = useMemo(
     () => expenses.filter((e) => e.projectId === projectId && e.type === 'viagem'),
@@ -40,12 +41,26 @@ const TravelDeclarationEditor = () => {
     [travelExpenses, selectedExpenses]
   );
 
+  const travelersTotal = useMemo(() => travelers.reduce((s, t) => s + t.value, 0), [travelers]);
+
   const toggleExpense = (id: string) => {
     setSelectedExpenses((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const addTraveler = () => {
+    setTravelers((prev) => [...prev, { id: `tv-${Date.now()}`, name: '', role: '', value: 0 }]);
+  };
+
+  const updateTraveler = (id: string, field: keyof Traveler, value: string | number) => {
+    setTravelers((prev) => prev.map((t) => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const removeTraveler = (id: string) => {
+    setTravelers((prev) => prev.filter((t) => t.id !== id));
   };
 
   return (
@@ -68,7 +83,7 @@ const TravelDeclarationEditor = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Viajante</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Viajante principal</label>
                 <Input value={traveler} onChange={(e) => setTraveler(e.target.value)} placeholder="Nome do viajante" />
               </div>
               <div>
@@ -92,6 +107,67 @@ const TravelDeclarationEditor = () => {
                 <Textarea value={observations} onChange={(e) => setObservations(e.target.value)} rows={2} placeholder="Observações adicionais..." />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Travelers list */}
+        <Card className="mb-6 animate-fade-in">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Viajantes
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={addTraveler}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar viajante
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-6">Nome</TableHead>
+                  <TableHead>Função</TableHead>
+                  <TableHead className="text-right">Valor (R$)</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {travelers.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="pl-6">
+                      <Input value={t.name} onChange={(e) => updateTraveler(t.id, 'name', e.target.value)} className="h-8 text-sm" placeholder="Nome" />
+                    </TableCell>
+                    <TableCell>
+                      <Input value={t.role} onChange={(e) => updateTraveler(t.id, 'role', e.target.value)} className="h-8 text-sm" placeholder="Função" />
+                    </TableCell>
+                    <TableCell>
+                      <Input type="number" step="0.01" value={t.value || ''} onChange={(e) => updateTraveler(t.id, 'value', parseFloat(e.target.value) || 0)} className="h-8 text-sm text-right" />
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeTraveler(t.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {travelers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-16 text-center text-muted-foreground">
+                      Nenhum viajante adicionado.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            {travelers.length > 0 && (
+              <div className="p-4 border-t flex justify-end">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total viajantes: </span>
+                  <span className="font-bold text-foreground tabular-nums">{formatCurrency(travelersTotal)}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

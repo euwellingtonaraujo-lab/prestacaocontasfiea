@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate } from '@/data/mockData';
+import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense } from '@/data/mockData';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -89,7 +90,7 @@ const ProjectDetail = () => {
         </div>
 
         {/* Content by tab */}
-        {tab === 'nf' && <NFSection expenses={projectExpenses} />}
+        {tab === 'nf' && <NFSection expenses={projectExpenses} projectId={projectId!} />}
         {tab === 'viagem' && (
           <TravelSection
             declarations={projectTravelDecl}
@@ -111,105 +112,229 @@ const ProjectDetail = () => {
   );
 };
 
-// NF Section
-const NFSection = ({ expenses: exps }: { expenses: typeof expenses }) => (
-  <Card className="animate-fade-in">
-    <CardContent className="p-0 overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="pl-6 min-w-[160px]">Item/Produto</TableHead>
-            <TableHead className="min-w-[200px]">Justificativa</TableHead>
-            <TableHead className="min-w-[120px]">Rubrica</TableHead>
-            <TableHead className="min-w-[110px]">Contrapartida</TableHead>
-            <TableHead className="min-w-[140px]">CNPJ</TableHead>
-            <TableHead className="min-w-[160px]">Razão Social</TableHead>
-            <TableHead className="min-w-[110px]">Data</TableHead>
-            <TableHead className="min-w-[110px] text-right">Valor</TableHead>
-            <TableHead className="min-w-[90px]">NF</TableHead>
-            <TableHead className="min-w-[180px]">Última edição</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {exps.map((exp) => (
-            <TableRow key={exp.id}>
-              <TableCell className="pl-6">
-                <Input defaultValue={exp.item} className="h-8 text-sm" />
-              </TableCell>
-              <TableCell>
-                <Textarea defaultValue={exp.justification} className="text-sm min-h-[36px] resize-none" rows={1} />
-              </TableCell>
-              <TableCell>
-                <Select defaultValue={exp.rubric}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Select defaultValue={exp.counterpart}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Input defaultValue={exp.supplierCnpj} className="h-8 text-sm font-mono" />
-              </TableCell>
-              <TableCell>
-                <Input defaultValue={exp.supplierName} className="h-8 text-sm" />
-              </TableCell>
-              <TableCell>
-                <Input type="date" defaultValue={exp.acquisitionDate} className="h-8 text-sm" />
-              </TableCell>
-              <TableCell className="text-right">
-                <Input type="number" defaultValue={exp.value} className="h-8 text-sm text-right" step="0.01" />
-              </TableCell>
-              <TableCell>
-                {exp.documentUrl ? (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs">
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Abrir
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" className="h-7 text-xs">
-                    <FileUp className="h-3 w-3 mr-1" />
-                    Anexar
-                  </Button>
-                )}
-              </TableCell>
-              <TableCell>
-                <p className="text-xs text-muted-foreground whitespace-nowrap">{exp.lastEditedAt}</p>
-                <p className="text-xs text-muted-foreground">por {exp.lastEditedBy}</p>
-              </TableCell>
-            </TableRow>
-          ))}
-          {exps.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
-                Nenhuma despesa cadastrada.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+// NF Section with inline edit icons and add dialog
+const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; projectId: string }) => {
+  const [editingCell, setEditingCell] = useState<{ expId: string; field: string } | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newExpense, setNewExpense] = useState({
+    item: '',
+    justification: '',
+    rubric: 'Equipamentos',
+    counterpart: 'Financiador',
+    supplierCnpj: '',
+    supplierName: '',
+    acquisitionDate: '',
+    value: '',
+  });
 
-      {/* Add row */}
-      <div className="p-4 border-t">
-        <Button variant="ghost" size="sm" className="text-primary" onClick={() => toast.info('Funcionalidade de adicionar linha em desenvolvimento')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar despesa
-        </Button>
+  const isEditing = (expId: string, field: string) =>
+    editingCell?.expId === expId && editingCell?.field === field;
+
+  const startEdit = (expId: string, field: string) => setEditingCell({ expId, field });
+  const stopEdit = () => setEditingCell(null);
+
+  const handleAddExpense = () => {
+    toast.success('Despesa adicionada com sucesso!');
+    setAddDialogOpen(false);
+    setNewExpense({ item: '', justification: '', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '', supplierName: '', acquisitionDate: '', value: '' });
+  };
+
+  const EditableText = ({ expId, field, value, mono }: { expId: string; field: string; value: string; mono?: boolean }) => {
+    if (isEditing(expId, field)) {
+      return <Input defaultValue={value} className="h-8 text-sm" autoFocus onBlur={stopEdit} onKeyDown={(e) => e.key === 'Enter' && stopEdit()} />;
+    }
+    const displayValue = field === 'justification' && value.length > 40 ? value.slice(0, 40) + '…' : value;
+    return (
+      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(expId, field)}>
+        <span className={`text-sm ${mono ? 'font-mono' : ''} truncate`} title={value}>{displayValue || '—'}</span>
+        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
       </div>
-    </CardContent>
-  </Card>
-);
+    );
+  };
+
+  return (
+    <>
+      <Card className="animate-fade-in">
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-6 min-w-[160px]">Item/Produto</TableHead>
+                <TableHead className="min-w-[180px]">Justificativa</TableHead>
+                <TableHead className="min-w-[120px]">Rubrica</TableHead>
+                <TableHead className="min-w-[110px]">Contrapartida</TableHead>
+                <TableHead className="min-w-[140px]">CNPJ</TableHead>
+                <TableHead className="min-w-[160px]">Razão Social</TableHead>
+                <TableHead className="min-w-[100px]">Data</TableHead>
+                <TableHead className="min-w-[100px] text-right">Valor</TableHead>
+                <TableHead className="min-w-[80px]">NF</TableHead>
+                <TableHead className="min-w-[140px]">Última edição</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {exps.map((exp) => (
+                <TableRow key={exp.id}>
+                  <TableCell className="pl-6">
+                    <EditableText expId={exp.id} field="item" value={exp.item} />
+                  </TableCell>
+                  <TableCell>
+                    <EditableText expId={exp.id} field="justification" value={exp.justification} />
+                  </TableCell>
+                  <TableCell>
+                    {isEditing(exp.id, 'rubric') ? (
+                      <Select defaultValue={exp.rubric} onValueChange={stopEdit}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'rubric')}>
+                        <Badge variant="secondary" className="text-xs">{exp.rubric}</Badge>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {isEditing(exp.id, 'counterpart') ? (
+                      <Select defaultValue={exp.counterpart} onValueChange={stopEdit}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'counterpart')}>
+                        <span className="text-sm">{exp.counterpart}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <EditableText expId={exp.id} field="cnpj" value={exp.supplierCnpj} mono />
+                  </TableCell>
+                  <TableCell>
+                    <EditableText expId={exp.id} field="supplier" value={exp.supplierName} />
+                  </TableCell>
+                  <TableCell>
+                    {isEditing(exp.id, 'date') ? (
+                      <Input type="date" defaultValue={exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
+                    ) : (
+                      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'date')}>
+                        <span className="text-sm tabular-nums">{formatDate(exp.acquisitionDate)}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {isEditing(exp.id, 'value') ? (
+                      <Input type="number" defaultValue={exp.value} className="h-8 text-sm text-right" step="0.01" autoFocus onBlur={stopEdit} />
+                    ) : (
+                      <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'value')}>
+                        <span className="text-sm tabular-nums">{formatCurrency(exp.value)}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {exp.documentUrl ? (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Abrir
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <FileUp className="h-3 w-3 mr-1" />
+                        Anexar
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">{exp.lastEditedAt}</p>
+                    <p className="text-xs text-muted-foreground">por {exp.lastEditedBy}</p>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {exps.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                    Nenhuma despesa cadastrada.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Add row */}
+          <div className="p-4 border-t">
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar despesa
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add Expense Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nova Despesa</DialogTitle>
+            <DialogDescription>Preencha os dados da despesa abaixo.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Item/Produto</label>
+              <Input value={newExpense.item} onChange={(e) => setNewExpense({ ...newExpense, item: e.target.value })} placeholder="Ex.: Computador Dell" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Justificativa</label>
+              <Textarea value={newExpense.justification} onChange={(e) => setNewExpense({ ...newExpense, justification: e.target.value })} placeholder="Justificativa da aquisição" rows={2} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Rubrica</label>
+              <Select value={newExpense.rubric} onValueChange={(v) => setNewExpense({ ...newExpense, rubric: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Contrapartida</label>
+              <Select value={newExpense.counterpart} onValueChange={(v) => setNewExpense({ ...newExpense, counterpart: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">CNPJ do Fornecedor</label>
+              <Input value={newExpense.supplierCnpj} onChange={(e) => setNewExpense({ ...newExpense, supplierCnpj: e.target.value })} placeholder="00.000.000/0001-00" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Razão Social</label>
+              <Input value={newExpense.supplierName} onChange={(e) => setNewExpense({ ...newExpense, supplierName: e.target.value })} placeholder="Nome do fornecedor" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data de Aquisição</label>
+              <Input type="date" value={newExpense.acquisitionDate} onChange={(e) => setNewExpense({ ...newExpense, acquisitionDate: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor (R$)</label>
+              <Input type="number" step="0.01" value={newExpense.value} onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })} placeholder="0,00" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAddExpense}>Adicionar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 // Travel Section
 const TravelSection = ({

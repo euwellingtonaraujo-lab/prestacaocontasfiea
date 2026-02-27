@@ -50,6 +50,14 @@ export interface TravelDeclaration {
   observations?: string;
   lastEditedAt: string;
   lastEditedBy: string;
+  travelers: Traveler[];
+}
+
+export interface Traveler {
+  id: string;
+  name: string;
+  role: string;
+  value: number;
 }
 
 export interface PersonnelDeclaration {
@@ -73,18 +81,21 @@ export interface TeamMember {
 }
 
 export const projects: Project[] = [
-  { id: '1', code: 'PRJ-2024-001', name: 'Modernização do Agronegócio Digital', entity: 'CNA', portfolio: 'Inovação', status: 'em_andamento', deadline: '2025-04-15' },
-  { id: '2', code: 'PRJ-2024-002', name: 'Capacitação Rural Sustentável', entity: 'CNA', portfolio: 'Educação', status: 'em_atraso', deadline: '2025-03-01' },
-  { id: '3', code: 'PRJ-2024-003', name: 'Infraestrutura de Conectividade', entity: 'SENAR', portfolio: 'Tecnologia', status: 'prazo_proximo', deadline: '2025-03-10' },
-  { id: '4', code: 'PRJ-2024-004', name: 'Programa de Sustentabilidade Hídrica', entity: 'CNA', portfolio: 'Sustentabilidade', status: 'em_andamento', deadline: '2025-06-30' },
-  { id: '5', code: 'PRJ-2024-005', name: 'Assistência Técnica e Gerencial', entity: 'SENAR', portfolio: 'Educação', status: 'em_atraso', deadline: '2025-02-28' },
-  { id: '6', code: 'PRJ-2024-006', name: 'Mercados Internacionais do Agro', entity: 'CNA', portfolio: 'Comércio Exterior', status: 'prazo_proximo', deadline: '2025-03-15' },
+  { id: '1', code: 'PRJ-2024-001', name: 'Modernização Tecnológica — Unidade Benedito', entity: 'Sesi', portfolio: 'Carteira 1', status: 'em_andamento', deadline: '2025-04-15' },
+  { id: '2', code: 'PRJ-2024-002', name: 'Capacitação Profissional em Soldagem', entity: 'Senai', portfolio: 'Carteira 2', status: 'em_atraso', deadline: '2025-03-01' },
+  { id: '3', code: 'PRJ-2024-003', name: 'Infraestrutura de Conectividade Industrial', entity: 'Senai', portfolio: 'Carteira 1', status: 'prazo_proximo', deadline: '2025-03-10' },
+  { id: '4', code: 'PRJ-2024-004', name: 'Programa de Saúde e Segurança do Trabalho', entity: 'Sesi', portfolio: 'Carteira 2', status: 'em_andamento', deadline: '2025-06-30' },
+  { id: '5', code: 'PRJ-2024-005', name: 'Laboratório de Automação e Robótica', entity: 'Senai', portfolio: 'Carteira 1', status: 'em_atraso', deadline: '2025-02-28' },
+  { id: '6', code: 'PRJ-2024-006', name: 'Centro de Inovação Digital', entity: 'Corporativo', portfolio: 'Carteira 2', status: 'prazo_proximo', deadline: '2025-03-15' },
 ];
 
 export const expenses: Expense[] = [
-  { id: 'e1', projectId: '1', type: 'nf', item: 'Computador Dell Latitude 5540', justification: 'Substituição de equipamento obsoleto para equipe técnica do projeto', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '72.381.189/0001-10', supplierName: 'Dell Computadores do Brasil Ltda', acquisitionDate: '2025-01-15', value: 8500.00, documentUrl: '#', lastEditedAt: '2025-02-20 14:30', lastEditedBy: 'Maria Silva' },
-  { id: 'e2', projectId: '1', type: 'nf', item: 'Licença Adobe Creative Suite', justification: 'Licenciamento para produção de material de comunicação', rubric: 'Software', counterpart: 'DR', supplierCnpj: '03.438.990/0001-35', supplierName: 'Adobe Systems Inc.', acquisitionDate: '2025-01-20', value: 3200.00, lastEditedAt: '2025-02-18 09:15', lastEditedBy: 'João Santos', funderComment: 'Verificar se a licença é anual ou mensal' },
-  { id: 'e3', projectId: '1', type: 'nf', item: 'Material de escritório', justification: 'Materiais de consumo para operação do escritório do projeto', rubric: 'Material de Consumo', counterpart: 'Financiador', supplierCnpj: '47.960.950/0001-21', supplierName: 'Kalunga S.A.', acquisitionDate: '2025-02-01', value: 1850.00, documentUrl: '#', lastEditedAt: '2025-02-22 11:00', lastEditedBy: 'Maria Silva' },
+  { id: 'e1', projectId: '1', type: 'nf', item: 'Computador Dell Latitude 5540', justification: 'Substituição de equipamento obsoleto para laboratório de informática da unidade', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '72.381.189/0001-10', supplierName: 'Dell Computadores do Brasil Ltda', acquisitionDate: '2025-01-15', value: 8500.00, documentUrl: '#', lastEditedAt: '2025-02-20 14:30', lastEditedBy: 'Maria Silva' },
+  { id: 'e2', projectId: '1', type: 'nf', item: 'Monitor LG UltraWide 29"', justification: 'Monitores para estações de trabalho do laboratório', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '01.166.372/0001-55', supplierName: 'LG Electronics do Brasil Ltda', acquisitionDate: '2025-01-18', value: 1890.00, documentUrl: '#', lastEditedAt: '2025-02-18 09:15', lastEditedBy: 'João Santos', funderComment: 'Verificar quantidade adquirida vs. aprovada' },
+  { id: 'e3', projectId: '1', type: 'nf', item: 'Mouse Logitech MX Master 3S (10 un.)', justification: 'Periféricos para as novas estações de trabalho', rubric: 'Equipamentos', counterpart: 'DR', supplierCnpj: '49.327.095/0001-20', supplierName: 'Logitech Brasil Ltda', acquisitionDate: '2025-01-20', value: 4500.00, lastEditedAt: '2025-02-19 11:00', lastEditedBy: 'Maria Silva' },
+  { id: 'e10', projectId: '1', type: 'nf', item: 'Serviço de instalação de rede estruturada', justification: 'Cabeamento e instalação de pontos de rede no laboratório renovado', rubric: 'Serviços de Terceiros', counterpart: 'Financiador', supplierCnpj: '33.456.789/0001-01', supplierName: 'NetConnect Soluções em TI Ltda', acquisitionDate: '2025-02-05', value: 12000.00, documentUrl: '#', lastEditedAt: '2025-02-22 10:00', lastEditedBy: 'João Santos' },
+  { id: 'e11', projectId: '1', type: 'nf', item: 'Serviço de internet dedicada (12 meses)', justification: 'Link dedicado de 500 Mbps para suportar as novas operações do laboratório', rubric: 'Serviços de Terceiros', counterpart: 'Financiador', supplierCnpj: '04.180.345/0001-90', supplierName: 'Vivo Empresas S.A.', acquisitionDate: '2025-02-10', value: 18000.00, lastEditedAt: '2025-02-22 15:30', lastEditedBy: 'Maria Silva' },
+  { id: 'e12', projectId: '1', type: 'nf', item: 'Teclado mecânico Redragon (10 un.)', justification: 'Periféricos ergonômicos para as estações do laboratório', rubric: 'Equipamentos', counterpart: 'DR', supplierCnpj: '22.198.745/0001-88', supplierName: 'TechShop Distribuidora Ltda', acquisitionDate: '2025-01-22', value: 2500.00, documentUrl: '#', lastEditedAt: '2025-02-20 09:45', lastEditedBy: 'João Santos' },
   { id: 'e4', projectId: '1', type: 'viagem', travelCategory: 'hospedagem', item: 'Hotel Brasília — Seminário Nacional', description: 'Hospedagem para participação no Seminário Nacional de Inovação', justification: '', rubric: 'Viagens', counterpart: 'Financiador', supplierCnpj: '00.000.000/0001-00', supplierName: 'Hotel Nacional Brasília', acquisitionDate: '2025-02-10', value: 1200.00, documentUrl: '#', lastEditedAt: '2025-02-15 16:00', lastEditedBy: 'Ana Costa' },
   { id: 'e5', projectId: '1', type: 'viagem', travelCategory: 'passagens', item: 'Passagem aérea SP → BSB', description: 'Ida e volta para Seminário Nacional de Inovação', justification: '', rubric: 'Viagens', counterpart: 'Financiador', supplierCnpj: '00.000.000/0002-00', supplierName: 'Latam Airlines', acquisitionDate: '2025-02-08', value: 1850.00, lastEditedAt: '2025-02-15 16:05', lastEditedBy: 'Ana Costa' },
   { id: 'e6', projectId: '1', type: 'viagem', travelCategory: 'ajuda_custo', item: 'Ajuda de custo — Seminário BSB', description: 'Ajuda de custo para alimentação durante evento', justification: '', rubric: 'Viagens', counterpart: 'Financiador', supplierCnpj: '', supplierName: '', acquisitionDate: '2025-02-10', value: 600.00, lastEditedAt: '2025-02-15 16:10', lastEditedBy: 'Ana Costa' },
@@ -94,7 +105,10 @@ export const expenses: Expense[] = [
 ];
 
 export const travelDeclarations: TravelDeclaration[] = [
-  { id: 'td1', projectId: '1', name: 'Declaração de Viagem #1', traveler: 'Ana Costa', periodStart: '2025-02-09', periodEnd: '2025-02-12', destination: 'Brasília/DF', event: 'Seminário Nacional de Inovação do Agronegócio', status: 'pronta', expenseIds: ['e4', 'e5', 'e6'], attachments: ['comprovante_hospedagem.pdf', 'fatura_passagens.pdf'], lastEditedAt: '2025-02-20 09:00', lastEditedBy: 'Ana Costa' },
+  { id: 'td1', projectId: '1', name: 'Declaração de Viagem #1', traveler: 'Ana Costa', periodStart: '2025-02-09', periodEnd: '2025-02-12', destination: 'Brasília/DF', event: 'Seminário Nacional de Inovação do Agronegócio', status: 'pronta', expenseIds: ['e4', 'e5', 'e6'], attachments: ['comprovante_hospedagem.pdf', 'fatura_passagens.pdf'], lastEditedAt: '2025-02-20 09:00', lastEditedBy: 'Ana Costa', travelers: [
+    { id: 'tv1', name: 'Ana Costa', role: 'Analista de Inovação', value: 2450.00 },
+    { id: 'tv2', name: 'Carlos Ferreira', role: 'Coordenador de Projeto', value: 1200.00 },
+  ] },
 ];
 
 export const personnelDeclarations: PersonnelDeclaration[] = [
@@ -107,8 +121,8 @@ export const personnelDeclarations: PersonnelDeclaration[] = [
 
 export const rubricOptions = ['Equipamentos', 'Software', 'Material de Consumo', 'Viagens', 'Pessoal', 'Consultoria', 'Serviços de Terceiros', 'Outros'];
 export const counterpartOptions = ['Financiador', 'DR'];
-export const portfolioOptions = ['Todas', 'Inovação', 'Educação', 'Tecnologia', 'Sustentabilidade', 'Comércio Exterior'];
-export const entityOptions = ['Todas', 'CNA', 'SENAR'];
+export const portfolioOptions = ['Todas', 'Carteira 1', 'Carteira 2'];
+export const entityOptions = ['Todas', 'Sesi', 'Senai', 'Corporativo'];
 
 export const statusLabels: Record<ProjectStatus, string> = {
   em_andamento: 'Em andamento',
