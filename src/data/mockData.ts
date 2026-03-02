@@ -106,8 +106,41 @@ export interface TeamMember {
   id: string;
   name: string;
   role: string;
+  workHours: number;
   value: number;
 }
+
+export interface Collaborator {
+  id: string;
+  name: string;
+  role: string;
+  workHours: number;
+  monthlySalary: number;
+}
+
+export interface ExpenseDiscount {
+  id: string;
+  expenseId: string;
+  codigoComprovante: string;
+  account: string;
+  value: number;
+  description: string;
+}
+
+export const collaborators: Collaborator[] = [
+  { id: 'col1', name: 'Carlos Ferreira', role: 'Coordenador de Projeto', workHours: 40, monthlySalary: 15000.00 },
+  { id: 'col2', name: 'Ana Costa', role: 'Analista de Inovação', workHours: 40, monthlySalary: 10000.00 },
+  { id: 'col3', name: 'Roberto Lima', role: 'Assistente Técnico', workHours: 30, monthlySalary: 8000.00 },
+  { id: 'col4', name: 'Fernanda Souza', role: 'Engenheira de Software', workHours: 40, monthlySalary: 12000.00 },
+  { id: 'col5', name: 'Marcos Oliveira', role: 'Técnico em Automação', workHours: 20, monthlySalary: 6000.00 },
+  { id: 'col6', name: 'Juliana Mendes', role: 'Analista Financeiro', workHours: 40, monthlySalary: 9500.00 },
+];
+
+export const expenseDiscounts: ExpenseDiscount[] = [
+  { id: 'disc1', expenseId: 'e1', codigoComprovante: 'NF-001', account: '41010503001 - Descontos Obtidos', value: -12.73, description: 'Desconto comercial referente NF 001 - Dell Computadores do Brasil Ltda' },
+  { id: 'disc2', expenseId: 'e10', codigoComprovante: 'NF-005', account: '41010503001 - Descontos Obtidos', value: -250.00, description: 'Desconto por pagamento antecipado NF 005 - NetConnect Soluções em TI Ltda' },
+  { id: 'disc3', expenseId: 'e10', codigoComprovante: 'NF-005', account: '41010503002 - Abatimentos', value: -100.00, description: 'Abatimento contratual NF 005 - NetConnect Soluções em TI Ltda' },
+];
 
 export const projects: Project[] = [
   { id: '1', code: 'PRJ-2024-001', name: 'Modernização Tecnológica — Unidade Benedito', entity: 'Sesi', portfolio: 'Carteira 1', status: 'em_andamento', approvalStatus: 'em_elaboracao', deadline: '2025-04-15', approvalHistory: [] },
@@ -142,9 +175,9 @@ export const travelDeclarations: TravelDeclaration[] = [
 
 export const personnelDeclarations: PersonnelDeclaration[] = [
   { id: 'pd1', projectId: '1', name: 'Declaração de Pessoal — Jan/2025', reference: '01/2025', status: 'rascunho', expenseIds: ['e7', 'e8', 'e9'], team: [
-    { id: 'tm1', name: 'Carlos Ferreira', role: 'Coordenador de Projeto', value: 15000.00 },
-    { id: 'tm2', name: 'Ana Costa', role: 'Analista de Inovação', value: 10000.00 },
-    { id: 'tm3', name: 'Roberto Lima', role: 'Assistente Técnico', value: 8000.00 },
+    { id: 'tm1', name: 'Carlos Ferreira', role: 'Coordenador de Projeto', workHours: 40, value: 15000.00 },
+    { id: 'tm2', name: 'Ana Costa', role: 'Analista de Inovação', workHours: 40, value: 10000.00 },
+    { id: 'tm3', name: 'Roberto Lima', role: 'Assistente Técnico', workHours: 30, value: 8000.00 },
   ], attachments: ['folha_jan2025.pdf'], lastEditedAt: '2025-02-15 14:00', lastEditedBy: 'RH' },
 ];
 
