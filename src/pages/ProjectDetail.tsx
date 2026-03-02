@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense } from '@/data/mockData';
+import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText } from 'lucide-react';
+import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ExpenseTab = 'nf' | 'viagem' | 'pessoal';
@@ -19,9 +20,13 @@ type ExpenseTab = 'nf' | 'viagem' | 'pessoal';
 const ProjectDetail = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const project = projects.find((p) => p.id === projectId);
   const [tab, setTab] = useState<ExpenseTab>('nf');
-
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(project?.approvalStatus || 'em_elaboracao');
+  const [approvalComment, setApprovalComment] = useState('');
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<ApprovalStatus | null>(null);
   const projectExpenses = useMemo(
     () => expenses.filter((e) => e.projectId === projectId && e.type === tab),
     [projectId, tab]
@@ -45,8 +50,32 @@ const ProjectDetail = () => {
     );
   }
 
-  const handleExport = () => toast.success('Planilha exportada com sucesso!');
+  const handleExport = () => {
+    if (approvalStatus !== 'aprovada') {
+      toast.error('A PC precisa estar aprovada para exportação final.');
+      return;
+    }
+    toast.success('Planilha exportada com sucesso!');
+  };
   const handleHistory = () => toast.info('Histórico de versões — funcionalidade em desenvolvimento');
+
+  const isGP = user?.role === 'gp';
+  const isPMO = user?.role === 'escritorio';
+  const canEdit = isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados');
+
+  const openApprovalDialog = (action: ApprovalStatus) => {
+    setPendingAction(action);
+    setApprovalComment('');
+    setApprovalDialogOpen(true);
+  };
+
+  const confirmApproval = () => {
+    if (pendingAction) {
+      setApprovalStatus(pendingAction);
+      toast.success(`Status alterado para: ${approvalStatusLabels[pendingAction]}`);
+    }
+    setApprovalDialogOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,13 +90,85 @@ const ProjectDetail = () => {
                 <History className="h-4 w-4 mr-2" />
                 Histórico
               </Button>
-              <Button size="sm" onClick={handleExport}>
+              <Button size="sm" onClick={handleExport} disabled={approvalStatus !== 'aprovada'}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar planilha
+                {approvalStatus !== 'aprovada' && <Lock className="h-3 w-3 ml-1" />}
               </Button>
             </>
           }
         />
+
+        {/* Approval Workflow */}
+        <Card className="mb-6 animate-fade-in">
+          <CardContent className="py-4 px-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Aprovação:</p>
+                <Badge variant={approvalStatus === 'aprovada' ? 'default' : approvalStatus === 'ajustes_solicitados' ? 'destructive' : 'secondary'} className="text-xs">
+                  {approvalStatusLabels[approvalStatus]}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* GP actions */}
+                {isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados') && (
+                  <Button size="sm" onClick={() => openApprovalDialog('submetida')}>
+                    <Send className="h-4 w-4 mr-2" />
+                    Submeter para aprovação
+                  </Button>
+                )}
+                {/* PMO actions */}
+                {isPMO && (approvalStatus === 'submetida' || approvalStatus === 'em_analise') && (
+                  <>
+                    {approvalStatus === 'submetida' && (
+                      <Button variant="outline" size="sm" onClick={() => { setApprovalStatus('em_analise'); toast.info('Status: Em análise'); }}>
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Iniciar análise
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" className="text-destructive" onClick={() => openApprovalDialog('ajustes_solicitados')}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Solicitar ajustes
+                    </Button>
+                    <Button size="sm" onClick={() => openApprovalDialog('aprovada')}>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Aprovar
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            {!canEdit && isGP && approvalStatus !== 'em_elaboracao' && approvalStatus !== 'ajustes_solicitados' && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                Edição bloqueada — a PC foi submetida para aprovação.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Approval dialog */}
+        <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {pendingAction === 'submetida' && 'Submeter para aprovação'}
+                {pendingAction === 'ajustes_solicitados' && 'Solicitar ajustes'}
+                {pendingAction === 'aprovada' && 'Aprovar Prestação de Contas'}
+              </DialogTitle>
+              <DialogDescription>Registre um comentário para esta ação (opcional).</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <Textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Comentário ou observação..." rows={3} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setApprovalDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={confirmApproval} variant={pendingAction === 'ajustes_solicitados' ? 'destructive' : 'default'}>
+                Confirmar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Status */}
         <div className="mb-6">
