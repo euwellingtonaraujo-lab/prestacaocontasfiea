@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { expenses, personnelDeclarations, formatCurrency, formatDate, TeamMember } from '@/data/mockData';
+import { expenses, personnelDeclarations, collaborators, formatCurrency, formatDate, TeamMember, Collaborator } from '@/data/mockData';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, Check, Download, Upload, X, Plus, Users, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,17 +45,31 @@ const PersonnelDeclarationEditor = () => {
     });
   };
 
-  const addTeamMember = () => {
-    setTeam((prev) => [...prev, { id: `tm-${Date.now()}`, name: '', role: '', value: 0 }]);
-  };
-
-  const updateTeamMember = (id: string, field: keyof TeamMember, value: string | number) => {
-    setTeam((prev) => prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)));
+  const addTeamMemberFromCollaborator = (collaboratorId: string) => {
+    const col = collaborators.find(c => c.id === collaboratorId);
+    if (!col) return;
+    // Prevent duplicates
+    if (team.some(t => t.name === col.name)) {
+      toast.error('Colaborador já adicionado.');
+      return;
+    }
+    setTeam((prev) => [...prev, {
+      id: `tm-${Date.now()}`,
+      name: col.name,
+      role: col.role,
+      workHours: col.workHours,
+      value: col.monthlySalary,
+    }]);
   };
 
   const removeTeamMember = (id: string) => {
     setTeam((prev) => prev.filter((t) => t.id !== id));
   };
+
+  // Available collaborators (not yet added)
+  const availableCollaborators = collaborators.filter(
+    c => !team.some(t => t.name === c.name)
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -127,10 +142,24 @@ const PersonnelDeclarationEditor = () => {
               <Users className="h-4 w-4 text-primary" />
               Relação da Equipe
             </CardTitle>
-            <Button size="sm" variant="outline" onClick={addTeamMember}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar pessoa
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select onValueChange={addTeamMemberFromCollaborator}>
+                <SelectTrigger className="w-[220px] h-9 text-sm">
+                  <SelectValue placeholder="Selecionar colaborador..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCollaborators.length === 0 ? (
+                    <SelectItem value="__none" disabled>Todos já adicionados</SelectItem>
+                  ) : (
+                    availableCollaborators.map((col) => (
+                      <SelectItem key={col.id} value={col.id}>
+                        {col.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -138,6 +167,7 @@ const PersonnelDeclarationEditor = () => {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="pl-6">Nome</TableHead>
                   <TableHead>Função</TableHead>
+                  <TableHead className="text-right">Carga Horária (h/sem)</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -145,31 +175,10 @@ const PersonnelDeclarationEditor = () => {
               <TableBody>
                 {team.map((member) => (
                   <TableRow key={member.id}>
-                    <TableCell className="pl-6">
-                      <Input
-                        value={member.name}
-                        onChange={(e) => updateTeamMember(member.id, 'name', e.target.value)}
-                        className="h-8 text-sm"
-                        placeholder="Nome"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={member.role}
-                        onChange={(e) => updateTeamMember(member.id, 'role', e.target.value)}
-                        className="h-8 text-sm"
-                        placeholder="Função"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={member.value}
-                        onChange={(e) => updateTeamMember(member.id, 'value', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm text-right"
-                        step="0.01"
-                      />
-                    </TableCell>
+                    <TableCell className="pl-6 font-medium">{member.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{member.role}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{member.workHours}h</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(member.value)}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeTeamMember(member.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
@@ -179,8 +188,8 @@ const PersonnelDeclarationEditor = () => {
                 ))}
                 {team.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">
-                      Nenhum membro adicionado.
+                    <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                      Nenhum membro adicionado. Selecione um colaborador acima.
                     </TableCell>
                   </TableRow>
                 )}

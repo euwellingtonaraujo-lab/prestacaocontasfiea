@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus } from '@/data/mockData';
+import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ExpenseTab = 'nf' | 'viagem' | 'pessoal';
@@ -217,6 +218,7 @@ const ProjectDetail = () => {
 const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; projectId: string }) => {
   const [editingCell, setEditingCell] = useState<{ expId: string; field: string } | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [discountDetailExpId, setDiscountDetailExpId] = useState<string | null>(null);
   const [newExpense, setNewExpense] = useState({
     item: '',
     justification: '',
@@ -227,6 +229,23 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
     acquisitionDate: '',
     value: '',
   });
+
+  // Build discount map: expenseId -> discounts[]
+  const discountMap = useMemo(() => {
+    const map: Record<string, typeof expenseDiscounts> = {};
+    expenseDiscounts.forEach((d) => {
+      if (!map[d.expenseId]) map[d.expenseId] = [];
+      map[d.expenseId].push(d);
+    });
+    return map;
+  }, []);
+
+  const getNetValue = (exp: Expense) => {
+    const discounts = discountMap[exp.id];
+    if (!discounts || discounts.length === 0) return null;
+    const totalDiscount = discounts.reduce((sum, d) => sum + Math.abs(d.value), 0);
+    return exp.value - totalDiscount;
+  };
 
   const isEditing = (expId: string, field: string) =>
     editingCell?.expId === expId && editingCell?.field === field;
@@ -253,8 +272,12 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
     );
   };
 
+  // Discount detail modal data
+  const discountDetailDiscounts = discountDetailExpId ? (discountMap[discountDetailExpId] || []) : [];
+  const discountDetailExp = discountDetailExpId ? exps.find(e => e.id === discountDetailExpId) : null;
+
   return (
-    <>
+    <TooltipProvider>
       <Card className="animate-fade-in">
         <CardContent className="p-0 overflow-x-auto">
           <Table>
@@ -267,95 +290,116 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
                 <TableHead className="min-w-[140px]">CNPJ</TableHead>
                 <TableHead className="min-w-[160px]">Razão Social</TableHead>
                 <TableHead className="min-w-[100px]">Data</TableHead>
-                <TableHead className="min-w-[100px] text-right">Valor</TableHead>
+                <TableHead className="min-w-[120px] text-right">Valor</TableHead>
                 <TableHead className="min-w-[80px]">NF</TableHead>
                 <TableHead className="min-w-[140px]">Última edição</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {exps.map((exp) => (
-                <TableRow key={exp.id}>
-                  <TableCell className="pl-6">
-                    <EditableText expId={exp.id} field="item" value={exp.item} />
-                  </TableCell>
-                  <TableCell>
-                    <EditableText expId={exp.id} field="justification" value={exp.justification} />
-                  </TableCell>
-                  <TableCell>
-                    {isEditing(exp.id, 'rubric') ? (
-                      <Select defaultValue={exp.rubric} onValueChange={stopEdit}>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'rubric')}>
-                        <Badge variant="secondary" className="text-xs">{exp.rubric}</Badge>
-                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isEditing(exp.id, 'counterpart') ? (
-                      <Select defaultValue={exp.counterpart} onValueChange={stopEdit}>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'counterpart')}>
-                        <span className="text-sm">{exp.counterpart}</span>
-                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <EditableText expId={exp.id} field="cnpj" value={exp.supplierCnpj} mono />
-                  </TableCell>
-                  <TableCell>
-                    <EditableText expId={exp.id} field="supplier" value={exp.supplierName} />
-                  </TableCell>
-                  <TableCell>
-                    {isEditing(exp.id, 'date') ? (
-                      <Input type="date" defaultValue={exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
-                    ) : (
-                      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'date')}>
-                        <span className="text-sm tabular-nums">{formatDate(exp.acquisitionDate)}</span>
-                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {isEditing(exp.id, 'value') ? (
-                      <Input type="number" defaultValue={exp.value} className="h-8 text-sm text-right" step="0.01" autoFocus onBlur={stopEdit} />
-                    ) : (
-                      <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'value')}>
-                        <span className="text-sm tabular-nums">{formatCurrency(exp.value)}</span>
-                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {exp.documentUrl ? (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs">
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        Abrir
-                      </Button>
-                    ) : (
-                      <Button variant="outline" size="sm" className="h-7 text-xs">
-                        <FileUp className="h-3 w-3 mr-1" />
-                        Anexar
-                      </Button>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-xs text-muted-foreground whitespace-nowrap">{exp.lastEditedAt}</p>
-                    <p className="text-xs text-muted-foreground">por {exp.lastEditedBy}</p>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {exps.map((exp) => {
+                const netValue = getNetValue(exp);
+                const hasDiscount = netValue !== null;
+                return (
+                  <TableRow key={exp.id}>
+                    <TableCell className="pl-6">
+                      <EditableText expId={exp.id} field="item" value={exp.item} />
+                    </TableCell>
+                    <TableCell>
+                      <EditableText expId={exp.id} field="justification" value={exp.justification} />
+                    </TableCell>
+                    <TableCell>
+                      {isEditing(exp.id, 'rubric') ? (
+                        <Select defaultValue={exp.rubric} onValueChange={stopEdit}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'rubric')}>
+                          <Badge variant="secondary" className="text-xs">{exp.rubric}</Badge>
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {isEditing(exp.id, 'counterpart') ? (
+                        <Select defaultValue={exp.counterpart} onValueChange={stopEdit}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'counterpart')}>
+                          <span className="text-sm">{exp.counterpart}</span>
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <EditableText expId={exp.id} field="cnpj" value={exp.supplierCnpj} mono />
+                    </TableCell>
+                    <TableCell>
+                      <EditableText expId={exp.id} field="supplier" value={exp.supplierName} />
+                    </TableCell>
+                    <TableCell>
+                      {isEditing(exp.id, 'date') ? (
+                        <Input type="date" defaultValue={exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
+                      ) : (
+                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'date')}>
+                          <span className="text-sm tabular-nums">{formatDate(exp.acquisitionDate)}</span>
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {hasDiscount ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className="inline-flex items-center gap-1.5 cursor-pointer rounded px-1.5 py-0.5 bg-warning/15 hover:bg-warning/25 transition-colors"
+                              onClick={() => setDiscountDetailExpId(exp.id)}
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                              <span className="text-sm tabular-nums font-medium text-warning-foreground">{formatCurrency(netValue!)}</span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-[240px]">
+                            <p className="text-xs">Valor líquido (desconto aplicado). Original: {formatCurrency(exp.value)}. Clique para detalhes.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        isEditing(exp.id, 'value') ? (
+                          <Input type="number" defaultValue={exp.value} className="h-8 text-sm text-right" step="0.01" autoFocus onBlur={stopEdit} />
+                        ) : (
+                          <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'value')}>
+                            <span className="text-sm tabular-nums">{formatCurrency(exp.value)}</span>
+                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          </div>
+                        )
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {exp.documentUrl ? (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Abrir
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" className="h-7 text-xs">
+                          <FileUp className="h-3 w-3 mr-1" />
+                          Anexar
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">{exp.lastEditedAt}</p>
+                      <p className="text-xs text-muted-foreground">por {exp.lastEditedBy}</p>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {exps.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
@@ -375,6 +419,54 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
           </div>
         </CardContent>
       </Card>
+
+      {/* Discount Detail Dialog */}
+      <Dialog open={!!discountDetailExpId} onOpenChange={(open) => { if (!open) setDiscountDetailExpId(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Detalhe do Desconto
+            </DialogTitle>
+            <DialogDescription>
+              {discountDetailExp && `Descontos aplicados à despesa: ${discountDetailExp.item}`}
+            </DialogDescription>
+          </DialogHeader>
+          {discountDetailExp && (
+            <div className="space-y-4 py-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Valor original:</span>
+                <span className="font-medium tabular-nums">{formatCurrency(discountDetailExp.value)}</span>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Conta</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Descrição</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {discountDetailDiscounts.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="text-sm font-mono">{d.account}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm text-destructive">{formatCurrency(d.value)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[200px]">{d.description}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex justify-between text-sm border-t pt-3">
+                <span className="font-medium">Valor líquido:</span>
+                <span className="font-bold tabular-nums text-warning-foreground">{formatCurrency(getNetValue(discountDetailExp)!)}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscountDetailExpId(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Expense Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -433,7 +525,7 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </TooltipProvider>
   );
 };
 
