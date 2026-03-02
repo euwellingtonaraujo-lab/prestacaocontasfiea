@@ -1,5 +1,32 @@
 export type ProjectStatus = 'em_andamento' | 'em_atraso' | 'prazo_proximo';
 
+export type ApprovalStatus = 'em_elaboracao' | 'submetida' | 'em_analise' | 'ajustes_solicitados' | 'aprovada';
+
+export const approvalStatusLabels: Record<ApprovalStatus, string> = {
+  em_elaboracao: 'Em elaboração',
+  submetida: 'Submetida para aprovação',
+  em_analise: 'Em análise (PMO)',
+  ajustes_solicitados: 'Ajustes solicitados',
+  aprovada: 'Aprovada',
+};
+
+export const approvalStatusColors: Record<ApprovalStatus, string> = {
+  em_elaboracao: 'bg-muted text-muted-foreground',
+  submetida: 'bg-info/15 text-info',
+  em_analise: 'bg-warning/15 text-warning-foreground',
+  ajustes_solicitados: 'bg-destructive/15 text-destructive',
+  aprovada: 'bg-success/15 text-success',
+};
+
+export interface ApprovalEvent {
+  id: string;
+  date: string;
+  user: string;
+  fromStatus: ApprovalStatus;
+  toStatus: ApprovalStatus;
+  comment?: string;
+}
+
 export interface Project {
   id: string;
   code: string;
@@ -7,7 +34,9 @@ export interface Project {
   entity: string;
   portfolio: string;
   status: ProjectStatus;
+  approvalStatus: ApprovalStatus;
   deadline: string;
+  approvalHistory: ApprovalEvent[];
 }
 
 export interface Expense {
@@ -81,12 +110,12 @@ export interface TeamMember {
 }
 
 export const projects: Project[] = [
-  { id: '1', code: 'PRJ-2024-001', name: 'Modernização Tecnológica — Unidade Benedito', entity: 'Sesi', portfolio: 'Carteira 1', status: 'em_andamento', deadline: '2025-04-15' },
-  { id: '2', code: 'PRJ-2024-002', name: 'Capacitação Profissional em Soldagem', entity: 'Senai', portfolio: 'Carteira 2', status: 'em_atraso', deadline: '2025-03-01' },
-  { id: '3', code: 'PRJ-2024-003', name: 'Infraestrutura de Conectividade Industrial', entity: 'Senai', portfolio: 'Carteira 1', status: 'prazo_proximo', deadline: '2025-03-10' },
-  { id: '4', code: 'PRJ-2024-004', name: 'Programa de Saúde e Segurança do Trabalho', entity: 'Sesi', portfolio: 'Carteira 2', status: 'em_andamento', deadline: '2025-06-30' },
-  { id: '5', code: 'PRJ-2024-005', name: 'Laboratório de Automação e Robótica', entity: 'Senai', portfolio: 'Carteira 1', status: 'em_atraso', deadline: '2025-02-28' },
-  { id: '6', code: 'PRJ-2024-006', name: 'Centro de Inovação Digital', entity: 'Corporativo', portfolio: 'Carteira 2', status: 'prazo_proximo', deadline: '2025-03-15' },
+  { id: '1', code: 'PRJ-2024-001', name: 'Modernização Tecnológica — Unidade Benedito', entity: 'Sesi', portfolio: 'Carteira 1', status: 'em_andamento', approvalStatus: 'em_elaboracao', deadline: '2025-04-15', approvalHistory: [] },
+  { id: '2', code: 'PRJ-2024-002', name: 'Capacitação Profissional em Soldagem', entity: 'Senai', portfolio: 'Carteira 2', status: 'em_atraso', approvalStatus: 'submetida', deadline: '2025-03-01', approvalHistory: [{ id: 'ah1', date: '2025-02-25 10:00', user: 'João Santos', fromStatus: 'em_elaboracao', toStatus: 'submetida', comment: 'PC finalizada para revisão do escritório' }] },
+  { id: '3', code: 'PRJ-2024-003', name: 'Infraestrutura de Conectividade Industrial', entity: 'Senai', portfolio: 'Carteira 1', status: 'prazo_proximo', approvalStatus: 'em_analise', deadline: '2025-03-10', approvalHistory: [] },
+  { id: '4', code: 'PRJ-2024-004', name: 'Programa de Saúde e Segurança do Trabalho', entity: 'Sesi', portfolio: 'Carteira 2', status: 'em_andamento', approvalStatus: 'ajustes_solicitados', deadline: '2025-06-30', approvalHistory: [{ id: 'ah2', date: '2025-02-20 14:00', user: 'Ana Costa', fromStatus: 'em_analise', toStatus: 'ajustes_solicitados', comment: 'Faltam comprovantes de 3 despesas' }] },
+  { id: '5', code: 'PRJ-2024-005', name: 'Laboratório de Automação e Robótica', entity: 'Senai', portfolio: 'Carteira 1', status: 'em_atraso', approvalStatus: 'aprovada', deadline: '2025-02-28', approvalHistory: [] },
+  { id: '6', code: 'PRJ-2024-006', name: 'Centro de Inovação Digital', entity: 'Corporativo', portfolio: 'Carteira 2', status: 'prazo_proximo', approvalStatus: 'em_elaboracao', deadline: '2025-03-15', approvalHistory: [] },
 ];
 
 export const expenses: Expense[] = [
