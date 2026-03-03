@@ -9,6 +9,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import TravelDeclarationEditor from "./pages/TravelDeclarationEditor";
 import PersonnelDeclarationEditor from "./pages/PersonnelDeclarationEditor";
 import UserManagement from "./pages/UserManagement";
+import PCSchedule from "./pages/PCSchedule";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/usuarios" element={<UserManagement />} />
               <Route path="/projeto/:projectId" element={<ProjectDetail />} />
+              <Route path="/projeto/:projectId/cronograma-pc" element={<PCSchedule />} />
               <Route path="/projeto/:projectId/viagem/:declarationId" element={<TravelDeclarationEditor />} />
               <Route path="/projeto/:projectId/pessoal/:declarationId" element={<PersonnelDeclarationEditor />} />
               <Route path="*" element={<NotFound />} />

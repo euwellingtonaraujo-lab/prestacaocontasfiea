@@ -56,6 +56,15 @@ export interface Expense {
   lastEditedBy: string;
   funderComment?: string;
   adjustment?: string;
+  // NF specific
+  nfNumber?: string;
+  provisionDate?: string;
+  nfDate?: string;
+  nfValue?: number;
+  usedValue?: number;
+  usedValueEdited?: boolean;
+  // Non-presentable flag
+  nonPresentable?: boolean;
   // Travel specific
   travelCategory?: 'hospedagem' | 'passagens' | 'ajuda_custo';
   description?: string;
@@ -127,6 +136,25 @@ export interface ExpenseDiscount {
   description: string;
 }
 
+export type PCStageStatus = 'nao_iniciada' | 'em_andamento' | 'concluida';
+
+export const pcStageStatusLabels: Record<PCStageStatus, string> = {
+  nao_iniciada: 'Não iniciada',
+  em_andamento: 'Em andamento',
+  concluida: 'Concluída',
+};
+
+export interface PCScheduleStage {
+  id: string;
+  projectId: string;
+  name: string;
+  status: PCStageStatus;
+  forecastValue: number;
+  selectedExpenseIds: string[];
+  selectedTravelDeclIds: string[];
+  selectedPersonnelDeclIds: string[];
+}
+
 export const collaborators: Collaborator[] = [
   { id: 'col1', name: 'Carlos Ferreira', role: 'Coordenador de Projeto', workHours: 40, monthlySalary: 15000.00 },
   { id: 'col2', name: 'Ana Costa', role: 'Analista de Inovação', workHours: 40, monthlySalary: 10000.00 },
@@ -152,12 +180,12 @@ export const projects: Project[] = [
 ];
 
 export const expenses: Expense[] = [
-  { id: 'e1', projectId: '1', type: 'nf', item: 'Computador Dell Latitude 5540', justification: 'Substituição de equipamento obsoleto para laboratório de informática da unidade', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '72.381.189/0001-10', supplierName: 'Dell Computadores do Brasil Ltda', acquisitionDate: '2025-01-15', value: 8500.00, documentUrl: '#', lastEditedAt: '2025-02-20 14:30', lastEditedBy: 'Maria Silva' },
-  { id: 'e2', projectId: '1', type: 'nf', item: 'Monitor LG UltraWide 29"', justification: 'Monitores para estações de trabalho do laboratório', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '01.166.372/0001-55', supplierName: 'LG Electronics do Brasil Ltda', acquisitionDate: '2025-01-18', value: 1890.00, documentUrl: '#', lastEditedAt: '2025-02-18 09:15', lastEditedBy: 'João Santos', funderComment: 'Verificar quantidade adquirida vs. aprovada' },
-  { id: 'e3', projectId: '1', type: 'nf', item: 'Mouse Logitech MX Master 3S (10 un.)', justification: 'Periféricos para as novas estações de trabalho', rubric: 'Equipamentos', counterpart: 'DR', supplierCnpj: '49.327.095/0001-20', supplierName: 'Logitech Brasil Ltda', acquisitionDate: '2025-01-20', value: 4500.00, lastEditedAt: '2025-02-19 11:00', lastEditedBy: 'Maria Silva' },
-  { id: 'e10', projectId: '1', type: 'nf', item: 'Serviço de instalação de rede estruturada', justification: 'Cabeamento e instalação de pontos de rede no laboratório renovado', rubric: 'Serviços de Terceiros', counterpart: 'Financiador', supplierCnpj: '33.456.789/0001-01', supplierName: 'NetConnect Soluções em TI Ltda', acquisitionDate: '2025-02-05', value: 12000.00, documentUrl: '#', lastEditedAt: '2025-02-22 10:00', lastEditedBy: 'João Santos' },
-  { id: 'e11', projectId: '1', type: 'nf', item: 'Serviço de internet dedicada (12 meses)', justification: 'Link dedicado de 500 Mbps para suportar as novas operações do laboratório', rubric: 'Serviços de Terceiros', counterpart: 'Financiador', supplierCnpj: '04.180.345/0001-90', supplierName: 'Vivo Empresas S.A.', acquisitionDate: '2025-02-10', value: 18000.00, lastEditedAt: '2025-02-22 15:30', lastEditedBy: 'Maria Silva' },
-  { id: 'e12', projectId: '1', type: 'nf', item: 'Teclado mecânico Redragon (10 un.)', justification: 'Periféricos ergonômicos para as estações do laboratório', rubric: 'Equipamentos', counterpart: 'DR', supplierCnpj: '22.198.745/0001-88', supplierName: 'TechShop Distribuidora Ltda', acquisitionDate: '2025-01-22', value: 2500.00, documentUrl: '#', lastEditedAt: '2025-02-20 09:45', lastEditedBy: 'João Santos' },
+  { id: 'e1', projectId: '1', type: 'nf', item: 'Computador Dell Latitude 5540', justification: 'Substituição de equipamento obsoleto para laboratório de informática da unidade', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '72.381.189/0001-10', supplierName: 'Dell Computadores do Brasil Ltda', acquisitionDate: '2025-01-15', value: 8500.00, nfNumber: 'NF-001', provisionDate: '2025-01-15', nfDate: '2025-01-15', nfValue: 8500.00, usedValue: 8500.00, documentUrl: '#', lastEditedAt: '2025-02-20 14:30', lastEditedBy: 'Maria Silva' },
+  { id: 'e2', projectId: '1', type: 'nf', item: 'Monitor LG UltraWide 29"', justification: 'Monitores para estações de trabalho do laboratório', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '01.166.372/0001-55', supplierName: 'LG Electronics do Brasil Ltda', acquisitionDate: '2025-01-18', value: 1890.00, nfNumber: 'NF-002', provisionDate: '2025-01-18', nfDate: '2025-01-18', nfValue: 1890.00, usedValue: 1890.00, documentUrl: '#', lastEditedAt: '2025-02-18 09:15', lastEditedBy: 'João Santos', funderComment: 'Verificar quantidade adquirida vs. aprovada' },
+  { id: 'e3', projectId: '1', type: 'nf', item: 'Mouse Logitech MX Master 3S (10 un.)', justification: 'Periféricos para as novas estações de trabalho', rubric: 'Equipamentos', counterpart: 'DR', supplierCnpj: '49.327.095/0001-20', supplierName: 'Logitech Brasil Ltda', acquisitionDate: '2025-01-20', value: 4500.00, nfNumber: 'NF-003', provisionDate: '2025-01-20', nfDate: '2025-01-20', nfValue: 4500.00, usedValue: 4500.00, lastEditedAt: '2025-02-19 11:00', lastEditedBy: 'Maria Silva' },
+  { id: 'e10', projectId: '1', type: 'nf', item: 'Serviço de instalação de rede estruturada', justification: 'Cabeamento e instalação de pontos de rede no laboratório renovado', rubric: 'Serviços de Terceiros', counterpart: 'Financiador', supplierCnpj: '33.456.789/0001-01', supplierName: 'NetConnect Soluções em TI Ltda', acquisitionDate: '2025-02-05', value: 12000.00, nfNumber: 'NF-005', provisionDate: '2025-02-05', nfDate: '2025-02-05', nfValue: 12000.00, usedValue: 12000.00, documentUrl: '#', lastEditedAt: '2025-02-22 10:00', lastEditedBy: 'João Santos' },
+  { id: 'e11', projectId: '1', type: 'nf', item: 'Serviço de internet dedicada (12 meses)', justification: 'Link dedicado de 500 Mbps para suportar as novas operações do laboratório', rubric: 'Serviços de Terceiros', counterpart: 'Financiador', supplierCnpj: '04.180.345/0001-90', supplierName: 'Vivo Empresas S.A.', acquisitionDate: '2025-02-10', value: 18000.00, nfNumber: 'NF-006', provisionDate: '2025-02-10', nfDate: '2025-02-10', nfValue: 18000.00, usedValue: 18000.00, lastEditedAt: '2025-02-22 15:30', lastEditedBy: 'Maria Silva' },
+  { id: 'e12', projectId: '1', type: 'nf', item: 'Teclado mecânico Redragon (10 un.)', justification: 'Periféricos ergonômicos para as estações do laboratório', rubric: 'Equipamentos', counterpart: 'DR', supplierCnpj: '22.198.745/0001-88', supplierName: 'TechShop Distribuidora Ltda', acquisitionDate: '2025-01-22', value: 2500.00, nfNumber: 'NF-004', provisionDate: '2025-01-22', nfDate: '2025-01-22', nfValue: 2500.00, usedValue: 2500.00, documentUrl: '#', lastEditedAt: '2025-02-20 09:45', lastEditedBy: 'João Santos' },
   { id: 'e4', projectId: '1', type: 'viagem', travelCategory: 'hospedagem', item: 'Hotel Brasília — Seminário Nacional', description: 'Hospedagem para participação no Seminário Nacional de Inovação', justification: '', rubric: 'Viagens', counterpart: 'Financiador', supplierCnpj: '00.000.000/0001-00', supplierName: 'Hotel Nacional Brasília', acquisitionDate: '2025-02-10', value: 1200.00, documentUrl: '#', lastEditedAt: '2025-02-15 16:00', lastEditedBy: 'Ana Costa' },
   { id: 'e5', projectId: '1', type: 'viagem', travelCategory: 'passagens', item: 'Passagem aérea SP → BSB', description: 'Ida e volta para Seminário Nacional de Inovação', justification: '', rubric: 'Viagens', counterpart: 'Financiador', supplierCnpj: '00.000.000/0002-00', supplierName: 'Latam Airlines', acquisitionDate: '2025-02-08', value: 1850.00, lastEditedAt: '2025-02-15 16:05', lastEditedBy: 'Ana Costa' },
   { id: 'e6', projectId: '1', type: 'viagem', travelCategory: 'ajuda_custo', item: 'Ajuda de custo — Seminário BSB', description: 'Ajuda de custo para alimentação durante evento', justification: '', rubric: 'Viagens', counterpart: 'Financiador', supplierCnpj: '', supplierName: '', acquisitionDate: '2025-02-10', value: 600.00, lastEditedAt: '2025-02-15 16:10', lastEditedBy: 'Ana Costa' },
@@ -179,6 +207,13 @@ export const personnelDeclarations: PersonnelDeclaration[] = [
     { id: 'tm2', name: 'Ana Costa', role: 'Analista de Inovação', workHours: 40, value: 10000.00 },
     { id: 'tm3', name: 'Roberto Lima', role: 'Assistente Técnico', workHours: 30, value: 8000.00 },
   ], attachments: ['folha_jan2025.pdf'], lastEditedAt: '2025-02-15 14:00', lastEditedBy: 'RH' },
+];
+
+export const pcScheduleStages: PCScheduleStage[] = [
+  { id: 'pc1', projectId: '1', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 35000.00, selectedExpenseIds: ['e1', 'e2', 'e3'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc2', projectId: '1', name: 'PC2 — 2º Trimestre', status: 'em_andamento', forecastValue: 80000.00, selectedExpenseIds: ['e10'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc3', projectId: '1', name: 'PC3 — 3º Trimestre', status: 'nao_iniciada', forecastValue: 50000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc4', projectId: '2', name: 'PC1 — 1º Semestre', status: 'nao_iniciada', forecastValue: 60000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
 ];
 
 export const rubricOptions = ['Equipamentos', 'Software', 'Material de Consumo', 'Viagens', 'Pessoal', 'Consultoria', 'Serviços de Terceiros', 'Outros'];
