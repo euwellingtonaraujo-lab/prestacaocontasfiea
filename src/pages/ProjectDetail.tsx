@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projects, expenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts } from '@/data/mockData';
+import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock, AlertTriangle } from 'lucide-react';
+import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock, AlertTriangle, EyeOff, Eye, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ExpenseTab = 'nf' | 'viagem' | 'pessoal';
@@ -28,9 +28,17 @@ const ProjectDetail = () => {
   const [approvalComment, setApprovalComment] = useState('');
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<ApprovalStatus | null>(null);
+  const [showNonPresentable, setShowNonPresentable] = useState(false);
+  const [localExpenses, setLocalExpenses] = useState<Expense[]>(allExpenses);
+
   const projectExpenses = useMemo(
-    () => expenses.filter((e) => e.projectId === projectId && e.type === tab),
-    [projectId, tab]
+    () => localExpenses.filter((e) => e.projectId === projectId && e.type === tab && !e.nonPresentable),
+    [projectId, tab, localExpenses]
+  );
+
+  const nonPresentableExpenses = useMemo(
+    () => localExpenses.filter((e) => e.projectId === projectId && e.nonPresentable),
+    [projectId, localExpenses]
   );
 
   const projectTravelDecl = useMemo(
@@ -78,6 +86,20 @@ const ProjectDetail = () => {
     setApprovalDialogOpen(false);
   };
 
+  const markNonPresentable = (expId: string) => {
+    setLocalExpenses(prev => prev.map(e => e.id === expId ? { ...e, nonPresentable: true } : e));
+    toast.success('Despesa marcada como não apresentável.');
+  };
+
+  const markPresentable = (expId: string) => {
+    setLocalExpenses(prev => prev.map(e => e.id === expId ? { ...e, nonPresentable: false } : e));
+    toast.success('Despesa restaurada para apresentável.');
+  };
+
+  const updateExpenseField = (expId: string, field: keyof Expense, value: any) => {
+    setLocalExpenses(prev => prev.map(e => e.id === expId ? { ...e, [field]: value } : e));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -87,6 +109,10 @@ const ProjectDetail = () => {
           backTo="/"
           actions={
             <>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/projeto/${projectId}/cronograma-pc`)}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Cronograma PC
+              </Button>
               <Button variant="outline" size="sm" onClick={handleHistory}>
                 <History className="h-4 w-4 mr-2" />
                 Histórico
@@ -111,14 +137,12 @@ const ProjectDetail = () => {
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                {/* GP actions */}
                 {isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados') && (
                   <Button size="sm" onClick={() => openApprovalDialog('submetida')}>
                     <Send className="h-4 w-4 mr-2" />
                     Submeter para aprovação
                   </Button>
                 )}
-                {/* PMO actions */}
                 {isPMO && (approvalStatus === 'submetida' || approvalStatus === 'em_analise') && (
                   <>
                     {approvalStatus === 'submetida' && (
@@ -192,7 +216,7 @@ const ProjectDetail = () => {
         </div>
 
         {/* Content by tab */}
-        {tab === 'nf' && <NFSection expenses={projectExpenses} projectId={projectId!} />}
+        {tab === 'nf' && <NFSection expenses={projectExpenses} projectId={projectId!} onMarkNonPresentable={markNonPresentable} onUpdateExpense={updateExpenseField} />}
         {tab === 'viagem' && (
           <TravelSection
             declarations={projectTravelDecl}
@@ -209,28 +233,82 @@ const ProjectDetail = () => {
             onCreate={() => navigate(`/projeto/${projectId}/pessoal/nova`)}
           />
         )}
+
+        {/* Non-presentable expenses section */}
+        <div className="mt-8">
+          <button
+            onClick={() => setShowNonPresentable(!showNonPresentable)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
+          >
+            <EyeOff className="h-4 w-4" />
+            Despesas não apresentáveis (documento ilegível) ({nonPresentableExpenses.length})
+            <span className="text-xs">({showNonPresentable ? 'ocultar' : 'mostrar'})</span>
+          </button>
+          {showNonPresentable && (
+            <Card className="animate-fade-in border-dashed">
+              <CardContent className="p-0">
+                {nonPresentableExpenses.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <EyeOff className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-sm text-muted-foreground">Nenhuma despesa não apresentável.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="pl-6">Item</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Rubrica</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {nonPresentableExpenses.map((exp) => (
+                        <TableRow key={exp.id} className="opacity-60">
+                          <TableCell className="pl-6 text-sm">{exp.item}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {exp.type === 'nf' ? 'NF' : exp.type === 'viagem' ? 'Viagem' : 'Pessoal'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{exp.rubric}</TableCell>
+                          <TableCell className="text-right tabular-nums text-sm">{formatCurrency(exp.value)}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => markPresentable(exp.id)}>
+                              <Eye className="h-3.5 w-3.5 mr-1" />
+                              Restaurar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-// NF Section with inline edit icons and add dialog
-const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; projectId: string }) => {
+// NF Section with new columns
+const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateExpense }: {
+  expenses: Expense[];
+  projectId: string;
+  onMarkNonPresentable: (id: string) => void;
+  onUpdateExpense: (id: string, field: keyof Expense, value: any) => void;
+}) => {
   const [editingCell, setEditingCell] = useState<{ expId: string; field: string } | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [discountDetailExpId, setDiscountDetailExpId] = useState<string | null>(null);
   const [newExpense, setNewExpense] = useState({
-    item: '',
-    justification: '',
-    rubric: 'Equipamentos',
-    counterpart: 'Financiador',
-    supplierCnpj: '',
-    supplierName: '',
-    acquisitionDate: '',
-    value: '',
+    item: '', justification: '', rubric: 'Equipamentos', counterpart: 'Financiador',
+    supplierCnpj: '', supplierName: '', provisionDate: '', value: '', nfNumber: '', nfDate: '', nfValue: '',
   });
 
-  // Build discount map: expenseId -> discounts[]
   const discountMap = useMemo(() => {
     const map: Record<string, typeof expenseDiscounts> = {};
     expenseDiscounts.forEach((d) => {
@@ -239,6 +317,13 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
     });
     return map;
   }, []);
+
+  const getSuggestedValue = (exp: Expense) => {
+    const discounts = discountMap[exp.id];
+    if (!discounts || discounts.length === 0) return null;
+    const totalDiscount = discounts.reduce((sum, d) => sum + Math.abs(d.value), 0);
+    return exp.value - totalDiscount;
+  };
 
   const getNetValue = (exp: Expense) => {
     const discounts = discountMap[exp.id];
@@ -249,14 +334,13 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
 
   const isEditing = (expId: string, field: string) =>
     editingCell?.expId === expId && editingCell?.field === field;
-
   const startEdit = (expId: string, field: string) => setEditingCell({ expId, field });
   const stopEdit = () => setEditingCell(null);
 
   const handleAddExpense = () => {
     toast.success('Despesa adicionada com sucesso!');
     setAddDialogOpen(false);
-    setNewExpense({ item: '', justification: '', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '', supplierName: '', acquisitionDate: '', value: '' });
+    setNewExpense({ item: '', justification: '', rubric: 'Equipamentos', counterpart: 'Financiador', supplierCnpj: '', supplierName: '', provisionDate: '', value: '', nfNumber: '', nfDate: '', nfValue: '' });
   };
 
   const EditableText = ({ expId, field, value, mono }: { expId: string; field: string; value: string; mono?: boolean }) => {
@@ -272,7 +356,6 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
     );
   };
 
-  // Discount detail modal data
   const discountDetailDiscounts = discountDetailExpId ? (discountMap[discountDetailExpId] || []) : [];
   const discountDetailExp = discountDetailExpId ? exps.find(e => e.id === discountDetailExpId) : null;
 
@@ -283,30 +366,43 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-6 min-w-[160px]">Item/Produto</TableHead>
+                <TableHead className="pl-6 min-w-[70px]">Nº NF</TableHead>
+                <TableHead className="min-w-[160px]">Item/Produto</TableHead>
                 <TableHead className="min-w-[180px]">Justificativa</TableHead>
                 <TableHead className="min-w-[120px]">Rubrica</TableHead>
-                <TableHead className="min-w-[110px]">Contrapartida</TableHead>
+                <TableHead className="min-w-[100px]">Contrapartida</TableHead>
                 <TableHead className="min-w-[140px]">CNPJ</TableHead>
-                <TableHead className="min-w-[160px]">Razão Social</TableHead>
-                <TableHead className="min-w-[100px]">Data</TableHead>
-                <TableHead className="min-w-[120px] text-right">Valor</TableHead>
-                <TableHead className="min-w-[80px]">NF</TableHead>
-                <TableHead className="min-w-[140px]">Última edição</TableHead>
+                <TableHead className="min-w-[150px]">Razão Social</TableHead>
+                <TableHead className="min-w-[100px]">Data Provisão</TableHead>
+                <TableHead className="min-w-[100px]">Data NF</TableHead>
+                <TableHead className="min-w-[130px] text-right">Valor Utilizado</TableHead>
+                <TableHead className="min-w-[110px] text-right">Valor NF</TableHead>
+                <TableHead className="min-w-[80px]">Doc</TableHead>
+                <TableHead className="min-w-[50px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {exps.map((exp) => {
-                const netValue = getNetValue(exp);
-                const hasDiscount = netValue !== null;
+                const suggestedValue = getSuggestedValue(exp);
+                const hasDiscount = suggestedValue !== null;
+                const currentUsedValue = exp.usedValue ?? exp.value;
+                const isUsedValueEdited = hasDiscount && currentUsedValue !== suggestedValue;
+
                 return (
                   <TableRow key={exp.id}>
+                    {/* Nº NF */}
                     <TableCell className="pl-6">
+                      <EditableText expId={exp.id} field="nfNumber" value={exp.nfNumber || ''} mono />
+                    </TableCell>
+                    {/* Item */}
+                    <TableCell>
                       <EditableText expId={exp.id} field="item" value={exp.item} />
                     </TableCell>
+                    {/* Justificativa */}
                     <TableCell>
                       <EditableText expId={exp.id} field="justification" value={exp.justification} />
                     </TableCell>
+                    {/* Rubrica */}
                     <TableCell>
                       {isEditing(exp.id, 'rubric') ? (
                         <Select defaultValue={exp.rubric} onValueChange={stopEdit}>
@@ -322,6 +418,7 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
                         </div>
                       )}
                     </TableCell>
+                    {/* Contrapartida */}
                     <TableCell>
                       {isEditing(exp.id, 'counterpart') ? (
                         <Select defaultValue={exp.counterpart} onValueChange={stopEdit}>
@@ -337,49 +434,111 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
                         </div>
                       )}
                     </TableCell>
+                    {/* CNPJ */}
                     <TableCell>
                       <EditableText expId={exp.id} field="cnpj" value={exp.supplierCnpj} mono />
                     </TableCell>
+                    {/* Razão Social */}
                     <TableCell>
                       <EditableText expId={exp.id} field="supplier" value={exp.supplierName} />
                     </TableCell>
+                    {/* Data Provisão */}
                     <TableCell>
-                      {isEditing(exp.id, 'date') ? (
-                        <Input type="date" defaultValue={exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
+                      {isEditing(exp.id, 'provisionDate') ? (
+                        <Input type="date" defaultValue={exp.provisionDate || exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
                       ) : (
-                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'date')}>
-                          <span className="text-sm tabular-nums">{formatDate(exp.acquisitionDate)}</span>
+                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'provisionDate')}>
+                          <span className="text-sm tabular-nums">{formatDate(exp.provisionDate || exp.acquisitionDate)}</span>
                           <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {hasDiscount ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              className="inline-flex items-center gap-1.5 cursor-pointer rounded px-1.5 py-0.5 bg-warning/15 hover:bg-warning/25 transition-colors"
-                              onClick={() => setDiscountDetailExpId(exp.id)}
-                            >
-                              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                              <span className="text-sm tabular-nums font-medium text-warning-foreground">{formatCurrency(netValue!)}</span>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="max-w-[240px]">
-                            <p className="text-xs">Valor líquido (desconto aplicado). Original: {formatCurrency(exp.value)}. Clique para detalhes.</p>
-                          </TooltipContent>
-                        </Tooltip>
+                    {/* Data NF */}
+                    <TableCell>
+                      {isEditing(exp.id, 'nfDate') ? (
+                        <Input type="date" defaultValue={exp.nfDate || exp.provisionDate || exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
                       ) : (
-                        isEditing(exp.id, 'value') ? (
-                          <Input type="number" defaultValue={exp.value} className="h-8 text-sm text-right" step="0.01" autoFocus onBlur={stopEdit} />
-                        ) : (
-                          <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'value')}>
-                            <span className="text-sm tabular-nums">{formatCurrency(exp.value)}</span>
-                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
-                          </div>
-                        )
+                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'nfDate')}>
+                          <span className="text-sm tabular-nums">{formatDate(exp.nfDate || exp.provisionDate || exp.acquisitionDate)}</span>
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                        </div>
                       )}
                     </TableCell>
+                    {/* Valor Utilizado no Projeto (always editable) */}
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-0.5">
+                        {hasDiscount && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="inline-flex items-center gap-1 cursor-pointer rounded px-1 py-0.5 bg-warning/15 hover:bg-warning/25 transition-colors text-xs"
+                                onClick={() => setDiscountDetailExpId(exp.id)}
+                              >
+                                <AlertTriangle className="h-3 w-3 text-warning" />
+                                <span className="tabular-nums text-warning-foreground">Sugerido: {formatCurrency(suggestedValue!)}</span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-[240px]">
+                              <p className="text-xs">Valor sugerido (bruto – descontos). Clique para detalhes.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {isEditing(exp.id, 'usedValue') ? (
+                          <Input
+                            type="number"
+                            defaultValue={currentUsedValue}
+                            className="h-8 text-sm text-right w-32"
+                            step="0.01"
+                            autoFocus
+                            onBlur={(e) => {
+                              const newVal = parseFloat(e.target.value);
+                              if (!isNaN(newVal)) {
+                                onUpdateExpense(exp.id, 'usedValue', newVal);
+                                if (hasDiscount && newVal !== suggestedValue) {
+                                  onUpdateExpense(exp.id, 'usedValueEdited', true);
+                                } else {
+                                  onUpdateExpense(exp.id, 'usedValueEdited', false);
+                                }
+                              }
+                              stopEdit();
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'usedValue')}>
+                            <span className={`text-sm tabular-nums font-medium ${isUsedValueEdited ? 'text-info' : ''}`}>
+                              {formatCurrency(currentUsedValue)}
+                            </span>
+                            {isUsedValueEdited && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-info border-info/30">editado</Badge>
+                            )}
+                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    {/* Valor NF */}
+                    <TableCell className="text-right">
+                      {isEditing(exp.id, 'nfValue') ? (
+                        <Input
+                          type="number"
+                          defaultValue={exp.nfValue ?? exp.value}
+                          className="h-8 text-sm text-right w-28"
+                          step="0.01"
+                          autoFocus
+                          onBlur={(e) => {
+                            const newVal = parseFloat(e.target.value);
+                            if (!isNaN(newVal)) onUpdateExpense(exp.id, 'nfValue', newVal);
+                            stopEdit();
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'nfValue')}>
+                          <span className="text-sm tabular-nums">{formatCurrency(exp.nfValue ?? exp.value)}</span>
+                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                        </div>
+                      )}
+                    </TableCell>
+                    {/* Doc */}
                     <TableCell>
                       {exp.documentUrl ? (
                         <Button variant="ghost" size="sm" className="h-7 text-xs">
@@ -393,16 +552,23 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
                         </Button>
                       )}
                     </TableCell>
+                    {/* Ações */}
                     <TableCell>
-                      <p className="text-xs text-muted-foreground whitespace-nowrap">{exp.lastEditedAt}</p>
-                      <p className="text-xs text-muted-foreground">por {exp.lastEditedBy}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarkNonPresentable(exp.id)}>
+                            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p className="text-xs">Marcar como não apresentável</p></TooltipContent>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {exps.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={13} className="h-32 text-center text-muted-foreground">
                     Nenhuma despesa cadastrada.
                   </TableCell>
                 </TableRow>
@@ -410,7 +576,6 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
             </TableBody>
           </Table>
 
-          {/* Add row */}
           <div className="p-4 border-t">
             <Button variant="ghost" size="sm" className="text-primary" onClick={() => setAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -435,7 +600,7 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
           {discountDetailExp && (
             <div className="space-y-4 py-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Valor original:</span>
+                <span className="text-muted-foreground">Valor original (bruto):</span>
                 <span className="font-medium tabular-nums">{formatCurrency(discountDetailExp.value)}</span>
               </div>
               <Table>
@@ -457,8 +622,12 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
                 </TableBody>
               </Table>
               <div className="flex justify-between text-sm border-t pt-3">
-                <span className="font-medium">Valor líquido:</span>
+                <span className="font-medium">Valor sugerido (líquido):</span>
                 <span className="font-bold tabular-nums text-warning-foreground">{formatCurrency(getNetValue(discountDetailExp)!)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Valor utilizado no projeto:</span>
+                <span className="font-bold tabular-nums">{formatCurrency(discountDetailExp.usedValue ?? discountDetailExp.value)}</span>
               </div>
             </div>
           )}
@@ -476,6 +645,14 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
             <DialogDescription>Preencha os dados da despesa abaixo.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Nº da NF</label>
+              <Input value={newExpense.nfNumber} onChange={(e) => setNewExpense({ ...newExpense, nfNumber: e.target.value })} placeholder="NF-000" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data de Provisão</label>
+              <Input type="date" value={newExpense.provisionDate} onChange={(e) => setNewExpense({ ...newExpense, provisionDate: e.target.value })} />
+            </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Item/Produto</label>
               <Input value={newExpense.item} onChange={(e) => setNewExpense({ ...newExpense, item: e.target.value })} placeholder="Ex.: Computador Dell" />
@@ -511,12 +688,16 @@ const NFSection = ({ expenses: exps, projectId }: { expenses: typeof expenses; p
               <Input value={newExpense.supplierName} onChange={(e) => setNewExpense({ ...newExpense, supplierName: e.target.value })} placeholder="Nome do fornecedor" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data de Aquisição</label>
-              <Input type="date" value={newExpense.acquisitionDate} onChange={(e) => setNewExpense({ ...newExpense, acquisitionDate: e.target.value })} />
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data da NF</label>
+              <Input type="date" value={newExpense.nfDate} onChange={(e) => setNewExpense({ ...newExpense, nfDate: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor (R$)</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor Utilizado (R$)</label>
               <Input type="number" step="0.01" value={newExpense.value} onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })} placeholder="0,00" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor da NF (R$)</label>
+              <Input type="number" step="0.01" value={newExpense.nfValue} onChange={(e) => setNewExpense({ ...newExpense, nfValue: e.target.value })} placeholder="0,00" />
             </div>
           </div>
           <DialogFooter>
@@ -573,7 +754,7 @@ const TravelSection = ({
             </TableHeader>
             <TableBody>
               {declarations.map((d) => {
-                const total = expenses
+                const total = allExpenses
                   .filter((e) => d.expenseIds.includes(e.id))
                   .reduce((s, e) => s + e.value, 0);
                 return (
@@ -655,7 +836,7 @@ const PersonnelSection = ({
             </TableHeader>
             <TableBody>
               {declarations.map((d) => {
-                const total = expenses
+                const total = allExpenses
                   .filter((e) => d.expenseIds.includes(e.id))
                   .reduce((s, e) => s + e.value, 0);
                 return (
