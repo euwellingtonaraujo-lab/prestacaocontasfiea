@@ -1,16 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  projects,
-  expenses as allExpenses,
-  travelDeclarations,
-  personnelDeclarations,
-  pcScheduleStages,
-  PCScheduleStage,
-  pcStageStatusLabels,
-  formatCurrency,
-  formatDate,
-} from '@/data/mockData';
+import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, pcScheduleStages, PCScheduleStage, pcStageStatusLabels, formatCurrency, formatDate } from '@/data/mockData';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,11 +26,6 @@ const PCSchedule = () => {
   const projectStages = useMemo(
     () => stages.filter((s) => s.projectId === projectId),
     [stages, projectId]
-  );
-
-  const hasInProgressStage = useMemo(
-    () => projectStages.some((s) => s.status === 'em_andamento'),
-    [projectStages]
   );
 
   // All expense IDs used in any completed or in-progress stage for this project (excluding current active)
@@ -126,11 +111,6 @@ const PCSchedule = () => {
   };
 
   const handleStartPC = (stageId: string) => {
-    // Only one PC can be in progress at a time for the same project.
-    if (hasInProgressStage) {
-      toast.error('Já existe uma prestação de contas em andamento. Conclua a PC atual para iniciar outra.');
-      return;
-    }
     setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'em_andamento' } : s));
     setActiveStageId(stageId);
     toast.info('PC iniciada. Selecione os itens elegíveis.');
@@ -145,19 +125,6 @@ const PCSchedule = () => {
   };
 
   const handleConcludePC = (stageId: string) => {
-    const stage = stages.find(s => s.id === stageId);
-    if (!stage) return;
-    const total = getStageTotal(stage);
-
-    if (!stage.forecastValue || stage.forecastValue <= 0) {
-      toast.error('Defina o valor previsto para concluir a prestação.');
-      return;
-    }
-    if (total < stage.forecastValue) {
-      toast.error('A prestação só pode ser concluída quando atingir o valor previsto.');
-      return;
-    }
-
     setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'concluida' } : s));
     setActiveStageId(null);
     toast.success('PC concluída com sucesso!');
@@ -211,13 +178,14 @@ const PCSchedule = () => {
     setEditForecastId(null);
   };
 
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title="Cronograma de Prestação de Contas"
           subtitle={`${project.name} · ${project.code}`}
-          backTo={`/`}
+          backTo={`/projeto/${projectId}`}
         />
 
         {/* Stages list */}
@@ -306,7 +274,7 @@ const PCSchedule = () => {
                         </Button>
                       )}
                       {stage.status === 'nao_iniciada' && (
-                        <Button size="sm" onClick={() => handleStartPC(stage.id)} disabled={hasInProgressStage}>
+                        <Button size="sm" onClick={() => handleStartPC(stage.id)}>
                           <Play className="h-4 w-4 mr-2" />
                           Iniciar PC
                         </Button>
@@ -469,10 +437,7 @@ const PCSchedule = () => {
 
                 <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={() => setActiveStageId(null)}>Fechar</Button>
-                  <Button
-                    onClick={() => handleConcludePC(activeStage.id)}
-                    disabled={!(activeStage.forecastValue > 0 && getStageTotal(activeStage) >= activeStage.forecastValue)}
-                  >
+                  <Button onClick={() => handleConcludePC(activeStage.id)}>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Concluir PC
                   </Button>
