@@ -4,12 +4,11 @@ import { expenses, personnelDeclarations, collaborators, formatCurrency, formatD
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Check, Download, Upload, X, Plus, Users, Trash2 } from 'lucide-react';
+import { Save, Check, Download, Plus, Users, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PersonnelDeclarationEditor = () => {
@@ -23,7 +22,6 @@ const PersonnelDeclarationEditor = () => {
     new Set(existing?.expenseIds || [])
   );
   const [team, setTeam] = useState<TeamMember[]>(existing?.team || []);
-  const [attachments, setAttachments] = useState<string[]>(existing?.attachments || []);
 
   const personnelExpenses = useMemo(
     () => expenses.filter((e) => e.projectId === projectId && e.type === 'pessoal'),
@@ -48,7 +46,6 @@ const PersonnelDeclarationEditor = () => {
   const addTeamMemberFromCollaborator = (collaboratorId: string) => {
     const col = collaborators.find(c => c.id === collaboratorId);
     if (!col) return;
-    // Prevent duplicates
     if (team.some(t => t.name === col.name)) {
       toast.error('Colaborador já adicionado.');
       return;
@@ -66,7 +63,6 @@ const PersonnelDeclarationEditor = () => {
     setTeam((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Available collaborators (not yet added)
   const availableCollaborators = collaborators.filter(
     c => !team.some(t => t.name === c.name)
   );
@@ -200,46 +196,6 @@ const PersonnelDeclarationEditor = () => {
                 <span className="text-muted-foreground">Total da equipe: </span>
                 <span className="font-bold text-foreground tabular-nums">{formatCurrency(teamTotal)}</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Part C - Attachments */}
-        <Card className="mb-8 animate-fade-in">
-          <CardHeader>
-            <CardTitle className="text-base">Documentos Comprobatórios</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Documentos da folha de pagamento, comprovantes de FGTS/encargos, etc.
-              </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => {
-                  setAttachments((prev) => [...prev, `comprovante_${prev.length + 1}.pdf`]);
-                  toast.success('Arquivo anexado!');
-                }}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload de arquivo
-                </Button>
-              </div>
-              {attachments.length > 0 && (
-                <div className="space-y-2 mt-3">
-                  {attachments.map((a, i) => (
-                    <div key={i} className="flex items-center justify-between bg-muted rounded-md px-3 py-2">
-                      <span className="text-sm">{a}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive"
-                        onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
