@@ -32,8 +32,8 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/usuarios" element={<UserManagement />} />
-              <Route path="/projeto/:projectId" element={<ProjectDetail />} />
-              <Route path="/projeto/:projectId/cronograma-pc" element={<PCSchedule />} />
+              <Route path="/projeto/:projectId" element={<PCSchedule />} />
+              <Route path="/projeto/:projectId/pc/:stageId" element={<ProjectDetail />} />
               <Route path="/projeto/:projectId/viagem/:declarationId" element={<TravelDeclarationEditor />} />
               <Route path="/projeto/:projectId/pessoal/:declarationId" element={<PersonnelDeclarationEditor />} />
               <Route path="*" element={<NotFound />} />

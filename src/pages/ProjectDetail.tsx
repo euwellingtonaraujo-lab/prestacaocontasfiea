@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts } from '@/data/mockData';
+import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts, pcScheduleStages, PCScheduleStage, pcStageStatusLabels } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -11,15 +11,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Download, History, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock, AlertTriangle, EyeOff, Eye, Calendar } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Download, FileUp, ExternalLink, Plus, Pencil, Trash2, FileCheck, FileText, Send, CheckCircle, RotateCcw, AlertCircle, Lock, AlertTriangle, EyeOff, Eye, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ExpenseTab = 'nf' | 'viagem' | 'pessoal';
 
 const ProjectDetail = () => {
-  const { projectId } = useParams();
+  const { projectId, stageId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const project = projects.find((p) => p.id === projectId);
@@ -30,31 +32,164 @@ const ProjectDetail = () => {
   const [pendingAction, setPendingAction] = useState<ApprovalStatus | null>(null);
   const [showNonPresentable, setShowNonPresentable] = useState(false);
   const [localExpenses, setLocalExpenses] = useState<Expense[]>(allExpenses);
+  const [stages, setStages] = useState<PCScheduleStage[]>(pcScheduleStages);
 
-  const projectExpenses = useMemo(
-    () => localExpenses.filter((e) => e.projectId === projectId && e.type === tab && !e.nonPresentable),
-    [projectId, tab, localExpenses]
-  );
+  const currentStage = stages.find(s => s.id === stageId);
+  const isReadOnly = currentStage?.status === 'concluida';
+  const isInProgress = currentStage?.status === 'em_andamento';
+
+  // IDs used in OTHER stages (not this one)
+  const otherStageExpenseIds = useMemo(() => {
+    const ids = new Set<string>();
+    stages
+      .filter(s => s.projectId === projectId && s.id !== stageId)
+      .forEach(s => s.selectedExpenseIds.forEach(id => ids.add(id)));
+    return ids;
+  }, [stages, projectId, stageId]);
+
+  const otherStageTravelDeclIds = useMemo(() => {
+    const ids = new Set<string>();
+    stages
+      .filter(s => s.projectId === projectId && s.id !== stageId)
+      .forEach(s => s.selectedTravelDeclIds.forEach(id => ids.add(id)));
+    return ids;
+  }, [stages, projectId, stageId]);
+
+  const otherStagePersonnelDeclIds = useMemo(() => {
+    const ids = new Set<string>();
+    stages
+      .filter(s => s.projectId === projectId && s.id !== stageId)
+      .forEach(s => s.selectedPersonnelDeclIds.forEach(id => ids.add(id)));
+    return ids;
+  }, [stages, projectId, stageId]);
+
+  // For concluded: show only items in this stage
+  // For in_progress: show items NOT used in other stages and not non-presentable
+  const projectExpenses = useMemo(() => {
+    if (!currentStage) return [];
+    if (isReadOnly) {
+      return localExpenses.filter(e => currentStage.selectedExpenseIds.includes(e.id) && e.type === tab);
+    }
+    return localExpenses.filter(e =>
+      e.projectId === projectId &&
+      e.type === tab &&
+      !e.nonPresentable &&
+      !otherStageExpenseIds.has(e.id)
+    );
+  }, [projectId, tab, localExpenses, currentStage, isReadOnly, otherStageExpenseIds]);
 
   const nonPresentableExpenses = useMemo(
     () => localExpenses.filter((e) => e.projectId === projectId && e.nonPresentable),
     [projectId, localExpenses]
   );
 
-  const projectTravelDecl = useMemo(
-    () => travelDeclarations.filter((d) => d.projectId === projectId),
-    [projectId]
-  );
+  const projectTravelDecl = useMemo(() => {
+    if (!currentStage) return [];
+    if (isReadOnly) {
+      return travelDeclarations.filter(d => currentStage.selectedTravelDeclIds.includes(d.id));
+    }
+    return travelDeclarations.filter(d =>
+      d.projectId === projectId && !otherStageTravelDeclIds.has(d.id)
+    );
+  }, [projectId, currentStage, isReadOnly, otherStageTravelDeclIds]);
 
-  const projectPersonnelDecl = useMemo(
-    () => personnelDeclarations.filter((d) => d.projectId === projectId),
-    [projectId]
-  );
+  const projectPersonnelDecl = useMemo(() => {
+    if (!currentStage) return [];
+    if (isReadOnly) {
+      return personnelDeclarations.filter(d => currentStage.selectedPersonnelDeclIds.includes(d.id));
+    }
+    return personnelDeclarations.filter(d =>
+      d.projectId === projectId && !otherStagePersonnelDeclIds.has(d.id)
+    );
+  }, [projectId, currentStage, isReadOnly, otherStagePersonnelDeclIds]);
+
+  // Toggle expense selection in stage
+  const toggleExpenseInStage = (expId: string) => {
+    if (!currentStage || isReadOnly) return;
+    setStages(prev => prev.map(s => {
+      if (s.id !== stageId) return s;
+      const has = s.selectedExpenseIds.includes(expId);
+      return {
+        ...s,
+        selectedExpenseIds: has
+          ? s.selectedExpenseIds.filter(id => id !== expId)
+          : [...s.selectedExpenseIds, expId],
+      };
+    }));
+  };
+
+  const toggleTravelDeclInStage = (declId: string) => {
+    if (!currentStage || isReadOnly) return;
+    setStages(prev => prev.map(s => {
+      if (s.id !== stageId) return s;
+      const has = s.selectedTravelDeclIds.includes(declId);
+      return {
+        ...s,
+        selectedTravelDeclIds: has
+          ? s.selectedTravelDeclIds.filter(id => id !== declId)
+          : [...s.selectedTravelDeclIds, declId],
+      };
+    }));
+  };
+
+  const togglePersonnelDeclInStage = (declId: string) => {
+    if (!currentStage || isReadOnly) return;
+    setStages(prev => prev.map(s => {
+      if (s.id !== stageId) return s;
+      const has = s.selectedPersonnelDeclIds.includes(declId);
+      return {
+        ...s,
+        selectedPersonnelDeclIds: has
+          ? s.selectedPersonnelDeclIds.filter(id => id !== declId)
+          : [...s.selectedPersonnelDeclIds, declId],
+      };
+    }));
+  };
+
+  // Calculate stage total
+  const getStageTotal = () => {
+    if (!currentStage) return 0;
+    const stage = stages.find(s => s.id === stageId)!;
+    const expTotal = localExpenses
+      .filter(e => stage.selectedExpenseIds.includes(e.id))
+      .reduce((sum, e) => sum + (e.usedValue ?? e.value), 0);
+    const travelTotal = travelDeclarations
+      .filter(d => stage.selectedTravelDeclIds.includes(d.id))
+      .reduce((sum, d) => {
+        return sum + allExpenses.filter(e => d.expenseIds.includes(e.id)).reduce((s, e) => s + e.value, 0);
+      }, 0);
+    const persTotal = personnelDeclarations
+      .filter(d => stage.selectedPersonnelDeclIds.includes(d.id))
+      .reduce((sum, d) => {
+        return sum + allExpenses.filter(e => d.expenseIds.includes(e.id)).reduce((s, e) => s + e.value, 0);
+      }, 0);
+    return expTotal + travelTotal + persTotal;
+  };
+
+  const handleConcludePC = () => {
+    if (!currentStage) return;
+    const total = getStageTotal();
+    if (total < currentStage.forecastValue) {
+      toast.error(`O valor selecionado (${formatCurrency(total)}) ainda não atingiu o valor previsto (${formatCurrency(currentStage.forecastValue)}). Selecione mais itens.`);
+      return;
+    }
+    setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'concluida' } : s));
+    toast.success('PC concluída com sucesso!');
+    navigate(`/projeto/${projectId}`);
+  };
 
   if (!project) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Projeto não encontrado.</p>
+      </div>
+    );
+  }
+
+  if (!currentStage) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Etapa de PC não encontrada.</p>
       </div>
     );
   }
@@ -66,7 +201,6 @@ const ProjectDetail = () => {
     }
     toast.success('Planilha exportada com sucesso!');
   };
-  const handleHistory = () => toast.info('Histórico de versões — funcionalidade em desenvolvimento');
 
   const isGP = user?.role === 'gp';
   const isPMO = user?.role === 'escritorio';
@@ -88,6 +222,8 @@ const ProjectDetail = () => {
 
   const markNonPresentable = (expId: string) => {
     setLocalExpenses(prev => prev.map(e => e.id === expId ? { ...e, nonPresentable: true } : e));
+    // Also remove from stage selection
+    setStages(prev => prev.map(s => s.id === stageId ? { ...s, selectedExpenseIds: s.selectedExpenseIds.filter(id => id !== expId) } : s));
     toast.success('Despesa marcada como não apresentável.');
   };
 
@@ -100,23 +236,18 @@ const ProjectDetail = () => {
     setLocalExpenses(prev => prev.map(e => e.id === expId ? { ...e, [field]: value } : e));
   };
 
+  const stageTotal = getStageTotal();
+  const updatedStage = stages.find(s => s.id === stageId)!;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title={project.name}
-          subtitle={`${project.code} · ${project.entity} · Prazo: ${formatDate(project.deadline)}`}
-          backTo="/"
+          subtitle={`${project.code} · ${project.entity} · ${currentStage.name}${isReadOnly ? ' (Consulta)' : ''}`}
+          backTo={`/projeto/${projectId}`}
           actions={
             <>
-              <Button variant="outline" size="sm" onClick={() => navigate(`/projeto/${projectId}/cronograma-pc`)}>
-                <Calendar className="h-4 w-4 mr-2" />
-                Cronograma PC
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleHistory}>
-                <History className="h-4 w-4 mr-2" />
-                Histórico
-              </Button>
               <Button size="sm" onClick={handleExport} disabled={approvalStatus !== 'aprovada'}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar planilha
@@ -125,6 +256,31 @@ const ProjectDetail = () => {
             </>
           }
         />
+
+        {/* PC Progress Summary */}
+        <Card className="mb-6 animate-fade-in bg-muted/30 border-dashed">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">{updatedStage.name}</span>
+              <Badge
+                variant={updatedStage.status === 'concluida' ? 'default' : 'outline'}
+                className="text-xs"
+              >
+                {pcStageStatusLabels[updatedStage.status]}
+              </Badge>
+            </div>
+            <PCProgressBar stage={updatedStage} total={stageTotal} />
+            {isInProgress && (
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" onClick={handleConcludePC}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Concluir PC
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Approval Workflow */}
         <Card className="mb-6 animate-fade-in">
@@ -216,13 +372,28 @@ const ProjectDetail = () => {
         </div>
 
         {/* Content by tab */}
-        {tab === 'nf' && <NFSection expenses={projectExpenses} projectId={projectId!} onMarkNonPresentable={markNonPresentable} onUpdateExpense={updateExpenseField} />}
+        {tab === 'nf' && (
+          <NFSection
+            expenses={projectExpenses}
+            projectId={projectId!}
+            onMarkNonPresentable={markNonPresentable}
+            onUpdateExpense={updateExpenseField}
+            readOnly={isReadOnly}
+            stageSelectedIds={updatedStage.selectedExpenseIds}
+            onToggleInStage={toggleExpenseInStage}
+            showCheckboxes={isInProgress}
+          />
+        )}
         {tab === 'viagem' && (
           <TravelSection
             declarations={projectTravelDecl}
             projectId={projectId!}
             onEdit={(id) => navigate(`/projeto/${projectId}/viagem/${id}`)}
             onCreate={() => navigate(`/projeto/${projectId}/viagem/nova`)}
+            readOnly={isReadOnly}
+            stageSelectedIds={updatedStage.selectedTravelDeclIds}
+            onToggleInStage={toggleTravelDeclInStage}
+            showCheckboxes={isInProgress}
           />
         )}
         {tab === 'pessoal' && (
@@ -231,75 +402,125 @@ const ProjectDetail = () => {
             projectId={projectId!}
             onEdit={(id) => navigate(`/projeto/${projectId}/pessoal/${id}`)}
             onCreate={() => navigate(`/projeto/${projectId}/pessoal/nova`)}
+            readOnly={isReadOnly}
+            stageSelectedIds={updatedStage.selectedPersonnelDeclIds}
+            onToggleInStage={togglePersonnelDeclInStage}
+            showCheckboxes={isInProgress}
           />
         )}
 
-        {/* Non-presentable expenses section */}
-        <div className="mt-8">
-          <button
-            onClick={() => setShowNonPresentable(!showNonPresentable)}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
-          >
-            <EyeOff className="h-4 w-4" />
-            Despesas não apresentáveis (documento ilegível) ({nonPresentableExpenses.length})
-            <span className="text-xs">({showNonPresentable ? 'ocultar' : 'mostrar'})</span>
-          </button>
-          {showNonPresentable && (
-            <Card className="animate-fade-in border-dashed">
-              <CardContent className="p-0">
-                {nonPresentableExpenses.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <EyeOff className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                    <p className="text-sm text-muted-foreground">Nenhuma despesa não apresentável.</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="pl-6">Item</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Rubrica</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {nonPresentableExpenses.map((exp) => (
-                        <TableRow key={exp.id} className="opacity-60">
-                          <TableCell className="pl-6 text-sm">{exp.item}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {exp.type === 'nf' ? 'NF' : exp.type === 'viagem' ? 'Viagem' : 'Pessoal'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">{exp.rubric}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm">{formatCurrency(exp.value)}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => markPresentable(exp.id)}>
-                              <Eye className="h-3.5 w-3.5 mr-1" />
-                              Restaurar
-                            </Button>
-                          </TableCell>
+        {/* Non-presentable expenses section - only in edit mode */}
+        {!isReadOnly && (
+          <div className="mt-8">
+            <button
+              onClick={() => setShowNonPresentable(!showNonPresentable)}
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
+            >
+              <EyeOff className="h-4 w-4" />
+              Despesas não apresentáveis (documento ilegível) ({nonPresentableExpenses.length})
+              <span className="text-xs">({showNonPresentable ? 'ocultar' : 'mostrar'})</span>
+            </button>
+            {showNonPresentable && (
+              <Card className="animate-fade-in border-dashed">
+                <CardContent className="p-0">
+                  {nonPresentableExpenses.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <EyeOff className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-sm text-muted-foreground">Nenhuma despesa não apresentável.</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="pl-6">Item</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Rubrica</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead>Ações</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                      </TableHeader>
+                      <TableBody>
+                        {nonPresentableExpenses.map((exp) => (
+                          <TableRow key={exp.id} className="opacity-60">
+                            <TableCell className="pl-6 text-sm">{exp.item}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {exp.type === 'nf' ? 'NF' : exp.type === 'viagem' ? 'Viagem' : 'Pessoal'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{exp.rubric}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{formatCurrency(exp.value)}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => markPresentable(exp.id)}>
+                                <Eye className="h-3.5 w-3.5 mr-1" />
+                                Restaurar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// NF Section with new columns
-const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateExpense }: {
+// PC Progress Bar
+const PCProgressBar = ({ stage, total }: { stage: PCScheduleStage; total: number }) => {
+  const pct = stage.forecastValue > 0 ? Math.min((total / stage.forecastValue) * 100, 999) : 0;
+  const faltante = Math.max(0, stage.forecastValue - total);
+  const excedente = Math.max(0, total - stage.forecastValue);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between flex-wrap gap-3 text-sm">
+        <div>
+          <span className="text-muted-foreground">Previsto: </span>
+          <span className="font-medium tabular-nums">{formatCurrency(stage.forecastValue)}</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Selecionado: </span>
+          <span className="font-medium tabular-nums">{formatCurrency(total)}</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground">% atingido: </span>
+          <span className="font-medium tabular-nums">{pct.toFixed(1)}%</span>
+        </div>
+        {faltante > 0 && (
+          <div>
+            <span className="text-muted-foreground">Faltante: </span>
+            <span className="font-medium tabular-nums text-warning-foreground">{formatCurrency(faltante)}</span>
+          </div>
+        )}
+        {excedente > 0 && (
+          <div className="flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3 text-warning" />
+            <span className="text-muted-foreground">Excedente: </span>
+            <span className="font-medium tabular-nums text-destructive">{formatCurrency(excedente)}</span>
+          </div>
+        )}
+      </div>
+      <Progress value={Math.min(pct, 100)} className="h-2 mt-2" />
+    </div>
+  );
+};
+
+// NF Section with checkboxes for stage selection
+const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateExpense, readOnly, stageSelectedIds, onToggleInStage, showCheckboxes }: {
   expenses: Expense[];
   projectId: string;
   onMarkNonPresentable: (id: string) => void;
   onUpdateExpense: (id: string, field: keyof Expense, value: any) => void;
+  readOnly?: boolean;
+  stageSelectedIds: string[];
+  onToggleInStage: (id: string) => void;
+  showCheckboxes: boolean;
 }) => {
   const [editingCell, setEditingCell] = useState<{ expId: string; field: string } | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -333,8 +554,8 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
   };
 
   const isEditing = (expId: string, field: string) =>
-    editingCell?.expId === expId && editingCell?.field === field;
-  const startEdit = (expId: string, field: string) => setEditingCell({ expId, field });
+    !readOnly && editingCell?.expId === expId && editingCell?.field === field;
+  const startEdit = (expId: string, field: string) => { if (!readOnly) setEditingCell({ expId, field }); };
   const stopEdit = () => setEditingCell(null);
 
   const handleAddExpense = () => {
@@ -349,9 +570,9 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
     }
     const displayValue = field === 'justification' && value.length > 40 ? value.slice(0, 40) + '…' : value;
     return (
-      <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(expId, field)}>
+      <div className={`flex items-center gap-1.5 group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(expId, field)}>
         <span className={`text-sm ${mono ? 'font-mono' : ''} truncate`} title={value}>{displayValue || '—'}</span>
-        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+        {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
       </div>
     );
   };
@@ -366,7 +587,8 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-6 min-w-[70px]">Nº NF</TableHead>
+                {showCheckboxes && <TableHead className="w-10 pl-4"></TableHead>}
+                <TableHead className={showCheckboxes ? '' : 'pl-6'} style={{ minWidth: 70 }}>Nº NF</TableHead>
                 <TableHead className="min-w-[160px]">Item/Produto</TableHead>
                 <TableHead className="min-w-[180px]">Justificativa</TableHead>
                 <TableHead className="min-w-[120px]">Rubrica</TableHead>
@@ -378,7 +600,7 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                 <TableHead className="min-w-[130px] text-right">Valor Utilizado</TableHead>
                 <TableHead className="min-w-[110px] text-right">Valor NF</TableHead>
                 <TableHead className="min-w-[80px]">Doc</TableHead>
-                <TableHead className="min-w-[50px]">Ações</TableHead>
+                {!readOnly && <TableHead className="min-w-[50px]">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -387,22 +609,20 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                 const hasDiscount = suggestedValue !== null;
                 const currentUsedValue = exp.usedValue ?? exp.value;
                 const isUsedValueEdited = hasDiscount && currentUsedValue !== suggestedValue;
+                const isSelected = stageSelectedIds.includes(exp.id);
 
                 return (
-                  <TableRow key={exp.id}>
-                    {/* Nº NF */}
-                    <TableCell className="pl-6">
+                  <TableRow key={exp.id} className={showCheckboxes && isSelected ? 'bg-primary/5' : ''}>
+                    {showCheckboxes && (
+                      <TableCell className="pl-4">
+                        <Checkbox checked={isSelected} onCheckedChange={() => onToggleInStage(exp.id)} />
+                      </TableCell>
+                    )}
+                    <TableCell className={showCheckboxes ? '' : 'pl-6'}>
                       <EditableText expId={exp.id} field="nfNumber" value={exp.nfNumber || ''} mono />
                     </TableCell>
-                    {/* Item */}
-                    <TableCell>
-                      <EditableText expId={exp.id} field="item" value={exp.item} />
-                    </TableCell>
-                    {/* Justificativa */}
-                    <TableCell>
-                      <EditableText expId={exp.id} field="justification" value={exp.justification} />
-                    </TableCell>
-                    {/* Rubrica */}
+                    <TableCell><EditableText expId={exp.id} field="item" value={exp.item} /></TableCell>
+                    <TableCell><EditableText expId={exp.id} field="justification" value={exp.justification} /></TableCell>
                     <TableCell>
                       {isEditing(exp.id, 'rubric') ? (
                         <Select defaultValue={exp.rubric} onValueChange={stopEdit}>
@@ -412,13 +632,12 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                           </SelectContent>
                         </Select>
                       ) : (
-                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'rubric')}>
+                        <div className={`flex items-center gap-1.5 group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'rubric')}>
                           <Badge variant="secondary" className="text-xs">{exp.rubric}</Badge>
-                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
                         </div>
                       )}
                     </TableCell>
-                    {/* Contrapartida */}
                     <TableCell>
                       {isEditing(exp.id, 'counterpart') ? (
                         <Select defaultValue={exp.counterpart} onValueChange={stopEdit}>
@@ -428,43 +647,34 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                           </SelectContent>
                         </Select>
                       ) : (
-                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'counterpart')}>
+                        <div className={`flex items-center gap-1.5 group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'counterpart')}>
                           <span className="text-sm">{exp.counterpart}</span>
-                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
                         </div>
                       )}
                     </TableCell>
-                    {/* CNPJ */}
-                    <TableCell>
-                      <EditableText expId={exp.id} field="cnpj" value={exp.supplierCnpj} mono />
-                    </TableCell>
-                    {/* Razão Social */}
-                    <TableCell>
-                      <EditableText expId={exp.id} field="supplier" value={exp.supplierName} />
-                    </TableCell>
-                    {/* Data Provisão */}
+                    <TableCell><EditableText expId={exp.id} field="cnpj" value={exp.supplierCnpj} mono /></TableCell>
+                    <TableCell><EditableText expId={exp.id} field="supplier" value={exp.supplierName} /></TableCell>
                     <TableCell>
                       {isEditing(exp.id, 'provisionDate') ? (
                         <Input type="date" defaultValue={exp.provisionDate || exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
                       ) : (
-                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'provisionDate')}>
+                        <div className={`flex items-center gap-1.5 group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'provisionDate')}>
                           <span className="text-sm tabular-nums">{formatDate(exp.provisionDate || exp.acquisitionDate)}</span>
-                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
                         </div>
                       )}
                     </TableCell>
-                    {/* Data NF */}
                     <TableCell>
                       {isEditing(exp.id, 'nfDate') ? (
                         <Input type="date" defaultValue={exp.nfDate || exp.provisionDate || exp.acquisitionDate} className="h-8 text-sm" autoFocus onBlur={stopEdit} />
                       ) : (
-                        <div className="flex items-center gap-1.5 group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'nfDate')}>
+                        <div className={`flex items-center gap-1.5 group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'nfDate')}>
                           <span className="text-sm tabular-nums">{formatDate(exp.nfDate || exp.provisionDate || exp.acquisitionDate)}</span>
-                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
                         </div>
                       )}
                     </TableCell>
-                    {/* Valor Utilizado no Projeto (always editable) */}
                     <TableCell className="text-right">
                       <div className="flex flex-col items-end gap-0.5">
                         {hasDiscount && (
@@ -483,7 +693,7 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        {isEditing(exp.id, 'usedValue') ? (
+                        {!readOnly && isEditing(exp.id, 'usedValue') ? (
                           <Input
                             type="number"
                             defaultValue={currentUsedValue}
@@ -504,21 +714,20 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                             }}
                           />
                         ) : (
-                          <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'usedValue')}>
+                          <div className={`flex items-center gap-1.5 justify-end group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'usedValue')}>
                             <span className={`text-sm tabular-nums font-medium ${isUsedValueEdited ? 'text-info' : ''}`}>
                               {formatCurrency(currentUsedValue)}
                             </span>
                             {isUsedValueEdited && (
                               <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-info border-info/30">editado</Badge>
                             )}
-                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                            {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
                           </div>
                         )}
                       </div>
                     </TableCell>
-                    {/* Valor NF */}
                     <TableCell className="text-right">
-                      {isEditing(exp.id, 'nfValue') ? (
+                      {!readOnly && isEditing(exp.id, 'nfValue') ? (
                         <Input
                           type="number"
                           defaultValue={exp.nfValue ?? exp.value}
@@ -532,13 +741,12 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                           }}
                         />
                       ) : (
-                        <div className="flex items-center gap-1.5 justify-end group/cell cursor-pointer" onClick={() => startEdit(exp.id, 'nfValue')}>
+                        <div className={`flex items-center gap-1.5 justify-end group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'nfValue')}>
                           <span className="text-sm tabular-nums">{formatCurrency(exp.nfValue ?? exp.value)}</span>
-                          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />
+                          {!readOnly && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity" />}
                         </div>
                       )}
                     </TableCell>
-                    {/* Doc */}
                     <TableCell>
                       {exp.documentUrl ? (
                         <Button variant="ghost" size="sm" className="h-7 text-xs">
@@ -546,42 +754,45 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                           Abrir
                         </Button>
                       ) : (
-                        <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={readOnly}>
                           <FileUp className="h-3 w-3 mr-1" />
                           Anexar
                         </Button>
                       )}
                     </TableCell>
-                    {/* Ações */}
-                    <TableCell>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarkNonPresentable(exp.id)}>
-                            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p className="text-xs">Marcar como não apresentável</p></TooltipContent>
-                      </Tooltip>
-                    </TableCell>
+                    {!readOnly && (
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarkNonPresentable(exp.id)}>
+                              <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p className="text-xs">Marcar como não apresentável</p></TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
               {exps.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={13} className="h-32 text-center text-muted-foreground">
-                    Nenhuma despesa cadastrada.
+                  <TableCell colSpan={showCheckboxes ? 14 : 13} className="h-32 text-center text-muted-foreground">
+                    Nenhuma despesa {readOnly ? 'apresentada nesta PC.' : 'disponível.'}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
 
-          <div className="p-4 border-t">
-            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar despesa
-            </Button>
-          </div>
+          {!readOnly && (
+            <div className="p-4 border-t">
+              <Button variant="ghost" size="sm" className="text-primary" onClick={() => setAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar despesa
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -638,74 +849,76 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
       </Dialog>
 
       {/* Add Expense Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Nova Despesa</DialogTitle>
-            <DialogDescription>Preencha os dados da despesa abaixo.</DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Nº da NF</label>
-              <Input value={newExpense.nfNumber} onChange={(e) => setNewExpense({ ...newExpense, nfNumber: e.target.value })} placeholder="NF-000" />
+      {!readOnly && (
+        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Nova Despesa</DialogTitle>
+              <DialogDescription>Preencha os dados da despesa abaixo.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Nº da NF</label>
+                <Input value={newExpense.nfNumber} onChange={(e) => setNewExpense({ ...newExpense, nfNumber: e.target.value })} placeholder="NF-000" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data de Provisão</label>
+                <Input type="date" value={newExpense.provisionDate} onChange={(e) => setNewExpense({ ...newExpense, provisionDate: e.target.value })} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Item/Produto</label>
+                <Input value={newExpense.item} onChange={(e) => setNewExpense({ ...newExpense, item: e.target.value })} placeholder="Ex.: Computador Dell" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Justificativa</label>
+                <Textarea value={newExpense.justification} onChange={(e) => setNewExpense({ ...newExpense, justification: e.target.value })} placeholder="Justificativa da aquisição" rows={2} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Rubrica</label>
+                <Select value={newExpense.rubric} onValueChange={(v) => setNewExpense({ ...newExpense, rubric: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Contrapartida</label>
+                <Select value={newExpense.counterpart} onValueChange={(v) => setNewExpense({ ...newExpense, counterpart: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">CNPJ do Fornecedor</label>
+                <Input value={newExpense.supplierCnpj} onChange={(e) => setNewExpense({ ...newExpense, supplierCnpj: e.target.value })} placeholder="00.000.000/0001-00" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Razão Social</label>
+                <Input value={newExpense.supplierName} onChange={(e) => setNewExpense({ ...newExpense, supplierName: e.target.value })} placeholder="Nome do fornecedor" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data da NF</label>
+                <Input type="date" value={newExpense.nfDate} onChange={(e) => setNewExpense({ ...newExpense, nfDate: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor Utilizado (R$)</label>
+                <Input type="number" step="0.01" value={newExpense.value} onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })} placeholder="0,00" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor da NF (R$)</label>
+                <Input type="number" step="0.01" value={newExpense.nfValue} onChange={(e) => setNewExpense({ ...newExpense, nfValue: e.target.value })} placeholder="0,00" />
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data de Provisão</label>
-              <Input type="date" value={newExpense.provisionDate} onChange={(e) => setNewExpense({ ...newExpense, provisionDate: e.target.value })} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Item/Produto</label>
-              <Input value={newExpense.item} onChange={(e) => setNewExpense({ ...newExpense, item: e.target.value })} placeholder="Ex.: Computador Dell" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Justificativa</label>
-              <Textarea value={newExpense.justification} onChange={(e) => setNewExpense({ ...newExpense, justification: e.target.value })} placeholder="Justificativa da aquisição" rows={2} />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Rubrica</label>
-              <Select value={newExpense.rubric} onValueChange={(v) => setNewExpense({ ...newExpense, rubric: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {rubricOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Contrapartida</label>
-              <Select value={newExpense.counterpart} onValueChange={(v) => setNewExpense({ ...newExpense, counterpart: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {counterpartOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">CNPJ do Fornecedor</label>
-              <Input value={newExpense.supplierCnpj} onChange={(e) => setNewExpense({ ...newExpense, supplierCnpj: e.target.value })} placeholder="00.000.000/0001-00" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Razão Social</label>
-              <Input value={newExpense.supplierName} onChange={(e) => setNewExpense({ ...newExpense, supplierName: e.target.value })} placeholder="Nome do fornecedor" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Data da NF</label>
-              <Input type="date" value={newExpense.nfDate} onChange={(e) => setNewExpense({ ...newExpense, nfDate: e.target.value })} />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor Utilizado (R$)</label>
-              <Input type="number" step="0.01" value={newExpense.value} onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })} placeholder="0,00" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Valor da NF (R$)</label>
-              <Input type="number" step="0.01" value={newExpense.nfValue} onChange={(e) => setNewExpense({ ...newExpense, nfValue: e.target.value })} placeholder="0,00" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleAddExpense}>Adicionar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleAddExpense}>Adicionar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </TooltipProvider>
   );
 };
@@ -716,24 +929,36 @@ const TravelSection = ({
   projectId,
   onEdit,
   onCreate,
+  readOnly,
+  stageSelectedIds,
+  onToggleInStage,
+  showCheckboxes,
 }: {
   declarations: typeof travelDeclarations;
   projectId: string;
   onEdit: (id: string) => void;
   onCreate: () => void;
+  readOnly?: boolean;
+  stageSelectedIds: string[];
+  onToggleInStage: (id: string) => void;
+  showCheckboxes: boolean;
 }) => (
   <div className="animate-fade-in">
-    <div className="mb-4">
-      <Button size="sm" onClick={onCreate}>
-        <Plus className="h-4 w-4 mr-2" />
-        Criar nova declaração de viagem
-      </Button>
-    </div>
+    {!readOnly && (
+      <div className="mb-4">
+        <Button size="sm" onClick={onCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Criar nova declaração de viagem
+        </Button>
+      </div>
+    )}
     {declarations.length === 0 ? (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />
-          <p className="text-muted-foreground">Nenhuma declaração criada.</p>
+          <p className="text-muted-foreground">
+            {readOnly ? 'Nenhuma declaração de viagem nesta PC.' : 'Nenhuma declaração disponível.'}
+          </p>
         </CardContent>
       </Card>
     ) : (
@@ -742,14 +967,15 @@ const TravelSection = ({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-6">Declaração</TableHead>
+                {showCheckboxes && <TableHead className="w-10 pl-4"></TableHead>}
+                <TableHead className={showCheckboxes ? '' : 'pl-6'}>Declaração</TableHead>
                 <TableHead>Viajante</TableHead>
                 <TableHead>Período</TableHead>
                 <TableHead>Destino</TableHead>
                 <TableHead>Evento</TableHead>
                 <TableHead className="text-right">Valor total</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Ações</TableHead>
+                {!readOnly && <TableHead>Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -757,9 +983,15 @@ const TravelSection = ({
                 const total = allExpenses
                   .filter((e) => d.expenseIds.includes(e.id))
                   .reduce((s, e) => s + e.value, 0);
+                const isSelected = stageSelectedIds.includes(d.id);
                 return (
-                  <TableRow key={d.id}>
-                    <TableCell className="pl-6 font-medium">{d.name}</TableCell>
+                  <TableRow key={d.id} className={showCheckboxes && isSelected ? 'bg-primary/5' : ''}>
+                    {showCheckboxes && (
+                      <TableCell className="pl-4">
+                        <Checkbox checked={isSelected} onCheckedChange={() => onToggleInStage(d.id)} />
+                      </TableCell>
+                    )}
+                    <TableCell className={`${showCheckboxes ? '' : 'pl-6'} font-medium`}>{d.name}</TableCell>
                     <TableCell>{d.traveler}</TableCell>
                     <TableCell className="text-sm">{formatDate(d.periodStart)} — {formatDate(d.periodEnd)}</TableCell>
                     <TableCell>{d.destination}</TableCell>
@@ -770,19 +1002,21 @@ const TravelSection = ({
                         {d.status === 'pronta' ? 'Pronta' : 'Rascunho'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(d.id)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success('Declaração gerada!')}>
-                          <FileCheck className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => toast.info('Exclusão em desenvolvimento')}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {!readOnly && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(d.id)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success('Declaração gerada!')}>
+                            <FileCheck className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => toast.info('Exclusão em desenvolvimento')}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
@@ -800,24 +1034,36 @@ const PersonnelSection = ({
   projectId,
   onEdit,
   onCreate,
+  readOnly,
+  stageSelectedIds,
+  onToggleInStage,
+  showCheckboxes,
 }: {
   declarations: typeof personnelDeclarations;
   projectId: string;
   onEdit: (id: string) => void;
   onCreate: () => void;
+  readOnly?: boolean;
+  stageSelectedIds: string[];
+  onToggleInStage: (id: string) => void;
+  showCheckboxes: boolean;
 }) => (
   <div className="animate-fade-in">
-    <div className="mb-4">
-      <Button size="sm" onClick={onCreate}>
-        <Plus className="h-4 w-4 mr-2" />
-        Criar nova declaração de pessoal
-      </Button>
-    </div>
+    {!readOnly && (
+      <div className="mb-4">
+        <Button size="sm" onClick={onCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Criar nova declaração de pessoal
+        </Button>
+      </div>
+    )}
     {declarations.length === 0 ? (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />
-          <p className="text-muted-foreground">Nenhuma declaração criada.</p>
+          <p className="text-muted-foreground">
+            {readOnly ? 'Nenhuma declaração de pessoal nesta PC.' : 'Nenhuma declaração disponível.'}
+          </p>
         </CardContent>
       </Card>
     ) : (
@@ -826,12 +1072,13 @@ const PersonnelSection = ({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-6">Declaração</TableHead>
+                {showCheckboxes && <TableHead className="w-10 pl-4"></TableHead>}
+                <TableHead className={showCheckboxes ? '' : 'pl-6'}>Declaração</TableHead>
                 <TableHead>Referência</TableHead>
                 <TableHead>Qtd. Pessoas</TableHead>
                 <TableHead className="text-right">Valor total</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Ações</TableHead>
+                {!readOnly && <TableHead>Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -839,9 +1086,15 @@ const PersonnelSection = ({
                 const total = allExpenses
                   .filter((e) => d.expenseIds.includes(e.id))
                   .reduce((s, e) => s + e.value, 0);
+                const isSelected = stageSelectedIds.includes(d.id);
                 return (
-                  <TableRow key={d.id}>
-                    <TableCell className="pl-6 font-medium">{d.name}</TableCell>
+                  <TableRow key={d.id} className={showCheckboxes && isSelected ? 'bg-primary/5' : ''}>
+                    {showCheckboxes && (
+                      <TableCell className="pl-4">
+                        <Checkbox checked={isSelected} onCheckedChange={() => onToggleInStage(d.id)} />
+                      </TableCell>
+                    )}
+                    <TableCell className={`${showCheckboxes ? '' : 'pl-6'} font-medium`}>{d.name}</TableCell>
                     <TableCell>{d.reference}</TableCell>
                     <TableCell>{d.team.length}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(total)}</TableCell>
@@ -850,19 +1103,21 @@ const PersonnelSection = ({
                         {d.status === 'pronta' ? 'Pronta' : 'Rascunho'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(d.id)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success('Declaração gerada!')}>
-                          <FileCheck className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => toast.info('Exclusão em desenvolvimento')}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {!readOnly && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(d.id)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.success('Declaração gerada!')}>
+                            <FileCheck className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => toast.info('Exclusão em desenvolvimento')}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
