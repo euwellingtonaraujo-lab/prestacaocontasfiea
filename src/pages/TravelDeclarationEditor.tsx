@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Check, Download, Upload, X, Plane, Plus, Trash2, Users } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Save, Check, Download, Upload, X, Plane, Plus, Trash2, Users, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TravelDeclarationEditor = () => {
@@ -36,6 +37,17 @@ const TravelDeclarationEditor = () => {
     [projectId]
   );
 
+  // Find expenses used in OTHER travel declarations
+  const usedInOtherDeclarations = useMemo(() => {
+    const map = new Map<string, string>();
+    travelDeclarations
+      .filter(d => d.projectId === projectId && d.id !== declarationId)
+      .forEach(d => {
+        d.expenseIds.forEach(eid => map.set(eid, d.name));
+      });
+    return map;
+  }, [projectId, declarationId]);
+
   const total = useMemo(
     () => travelExpenses.filter((e) => selectedExpenses.has(e.id)).reduce((s, e) => s + e.value, 0),
     [travelExpenses, selectedExpenses]
@@ -44,6 +56,7 @@ const TravelDeclarationEditor = () => {
   const travelersTotal = useMemo(() => travelers.reduce((s, t) => s + t.value, 0), [travelers]);
 
   const toggleExpense = (id: string) => {
+    if (usedInOtherDeclarations.has(id)) return;
     setSelectedExpenses((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -63,13 +76,15 @@ const TravelDeclarationEditor = () => {
     setTravelers((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const goBack = () => navigate(-1);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto px-6 py-8">
         <PageHeader
           title={isNew ? 'Nova Declaração de Viagem' : `Editar Declaração de Viagem`}
           subtitle={`Projeto ${projectId}`}
-          backTo={`/projeto/${projectId}`}
+          onBack={goBack}
         />
 
         {/* Part A - Travel data */}
@@ -177,52 +192,77 @@ const TravelDeclarationEditor = () => {
             <CardTitle className="text-base">Despesas da Viagem</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-6 w-10"></TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Documento</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {travelExpenses.map((exp) => (
-                  <TableRow key={exp.id}>
-                    <TableCell className="pl-6">
-                      <Checkbox
-                        checked={selectedExpenses.has(exp.id)}
-                        onCheckedChange={() => toggleExpense(exp.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{exp.description || exp.item}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs capitalize">
-                        {exp.travelCategory?.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="tabular-nums">{formatDate(exp.acquisitionDate)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(exp.value)}</TableCell>
-                    <TableCell>
-                      {exp.documentUrl ? (
-                        <Badge variant="outline" className="text-xs">Anexado</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+            <TooltipProvider>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-6 w-10"></TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Documento</TableHead>
+                    <TableHead>Situação</TableHead>
                   </TableRow>
-                ))}
-                {travelExpenses.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      Nenhuma despesa de viagem cadastrada.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {travelExpenses.map((exp) => {
+                    const usedIn = usedInOtherDeclarations.get(exp.id);
+                    const isUsed = !!usedIn;
+                    return (
+                      <TableRow key={exp.id} className={isUsed ? 'opacity-50' : ''}>
+                        <TableCell className="pl-6">
+                          <Checkbox
+                            checked={selectedExpenses.has(exp.id)}
+                            onCheckedChange={() => toggleExpense(exp.id)}
+                            disabled={isUsed}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{exp.description || exp.item}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs capitalize">
+                            {exp.travelCategory?.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums">{formatDate(exp.acquisitionDate)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(exp.value)}</TableCell>
+                        <TableCell>
+                          {exp.documentUrl ? (
+                            <Badge variant="outline" className="text-xs">Anexado</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isUsed ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="text-[10px] cursor-help">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Já utilizada
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Utilizada em: {usedIn}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Disponível</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {travelExpenses.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        Nenhuma despesa de viagem cadastrada.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
             <div className="p-4 border-t flex justify-end">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total consolidado: </span>
@@ -274,7 +314,7 @@ const TravelDeclarationEditor = () => {
 
         {/* Footer actions */}
         <div className="flex items-center justify-end gap-3 pb-8">
-          <Button variant="outline" onClick={() => { toast.success('Rascunho salvo!'); navigate(`/projeto/${projectId}`); }}>
+          <Button variant="outline" onClick={() => { toast.success('Rascunho salvo!'); goBack(); }}>
             <Save className="h-4 w-4 mr-2" />
             Salvar rascunho
           </Button>

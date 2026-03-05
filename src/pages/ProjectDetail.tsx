@@ -364,7 +364,7 @@ const ProjectDetail = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="nf">Despesas com Nota Fiscal</SelectItem>
+              <SelectItem value="nf">Materiais/Serviços</SelectItem>
               <SelectItem value="viagem">Viagens</SelectItem>
               <SelectItem value="pessoal">Folha de Pessoal</SelectItem>
             </SelectContent>
@@ -548,9 +548,15 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
 
   const getNetValue = (exp: Expense) => {
     const discounts = discountMap[exp.id];
-    if (!discounts || discounts.length === 0) return null;
+    if (!discounts || discounts.length === 0) return exp.value;
     const totalDiscount = discounts.reduce((sum, d) => sum + Math.abs(d.value), 0);
     return exp.value - totalDiscount;
+  };
+
+  // The displayed usedValue: if not manually edited, use net value (with discount)
+  const getDisplayUsedValue = (exp: Expense) => {
+    if (exp.usedValueEdited) return exp.usedValue ?? exp.value;
+    return getNetValue(exp);
   };
 
   const isEditing = (expId: string, field: string) =>
@@ -605,10 +611,10 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
             </TableHeader>
             <TableBody>
               {exps.map((exp) => {
+                const hasDiscount = !!discountMap[exp.id] && discountMap[exp.id].length > 0;
+                const displayUsedValue = getDisplayUsedValue(exp);
                 const suggestedValue = getSuggestedValue(exp);
-                const hasDiscount = suggestedValue !== null;
-                const currentUsedValue = exp.usedValue ?? exp.value;
-                const isUsedValueEdited = hasDiscount && currentUsedValue !== suggestedValue;
+                const isUsedValueEdited = exp.usedValueEdited && displayUsedValue !== suggestedValue;
                 const isSelected = stageSelectedIds.includes(exp.id);
 
                 return (
@@ -685,18 +691,18 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                                 onClick={() => setDiscountDetailExpId(exp.id)}
                               >
                                 <AlertTriangle className="h-3 w-3 text-warning" />
-                                <span className="tabular-nums text-warning-foreground">Sugerido: {formatCurrency(suggestedValue!)}</span>
+                                <span className="text-[10px] text-warning-foreground">Desconto aplicado</span>
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="left" className="max-w-[240px]">
-                              <p className="text-xs">Valor sugerido (bruto – descontos). Clique para detalhes.</p>
+                              <p className="text-xs">Valor com desconto deduzido. Clique para detalhes.</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                         {!readOnly && isEditing(exp.id, 'usedValue') ? (
                           <Input
                             type="number"
-                            defaultValue={currentUsedValue}
+                            defaultValue={displayUsedValue}
                             className="h-8 text-sm text-right w-32"
                             step="0.01"
                             autoFocus
@@ -716,7 +722,7 @@ const NFSection = ({ expenses: exps, projectId, onMarkNonPresentable, onUpdateEx
                         ) : (
                           <div className={`flex items-center gap-1.5 justify-end group/cell ${readOnly ? '' : 'cursor-pointer'}`} onClick={() => startEdit(exp.id, 'usedValue')}>
                             <span className={`text-sm tabular-nums font-medium ${isUsedValueEdited ? 'text-info' : ''}`}>
-                              {formatCurrency(currentUsedValue)}
+                              {formatCurrency(displayUsedValue)}
                             </span>
                             {isUsedValueEdited && (
                               <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-info border-info/30">editado</Badge>
