@@ -4,11 +4,13 @@ import { expenses, personnelDeclarations, collaborators, formatCurrency, formatD
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Check, Download, Plus, Users, Trash2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Save, Check, Download, Users, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PersonnelDeclarationEditor = () => {
@@ -28,6 +30,17 @@ const PersonnelDeclarationEditor = () => {
     [projectId]
   );
 
+  // Find expenses used in OTHER personnel declarations
+  const usedInOtherDeclarations = useMemo(() => {
+    const map = new Map<string, string>();
+    personnelDeclarations
+      .filter(d => d.projectId === projectId && d.id !== declarationId)
+      .forEach(d => {
+        d.expenseIds.forEach(eid => map.set(eid, d.name));
+      });
+    return map;
+  }, [projectId, declarationId]);
+
   const expenseTotal = useMemo(
     () => personnelExpenses.filter((e) => selectedExpenses.has(e.id)).reduce((s, e) => s + e.value, 0),
     [personnelExpenses, selectedExpenses]
@@ -36,6 +49,7 @@ const PersonnelDeclarationEditor = () => {
   const teamTotal = useMemo(() => team.reduce((s, t) => s + t.value, 0), [team]);
 
   const toggleExpense = (id: string) => {
+    if (usedInOtherDeclarations.has(id)) return;
     setSelectedExpenses((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -59,6 +73,10 @@ const PersonnelDeclarationEditor = () => {
     }]);
   };
 
+  const updateTeamMember = (id: string, field: 'workHours' | 'value', value: number) => {
+    setTeam((prev) => prev.map((t) => t.id === id ? { ...t, [field]: value } : t));
+  };
+
   const removeTeamMember = (id: string) => {
     setTeam((prev) => prev.filter((t) => t.id !== id));
   };
@@ -67,13 +85,15 @@ const PersonnelDeclarationEditor = () => {
     c => !team.some(t => t.name === c.name)
   );
 
+  const goBack = () => navigate(-1);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto px-6 py-8">
         <PageHeader
           title={isNew ? 'Nova Declaração de Pessoal' : 'Editar Declaração de Pessoal'}
           subtitle={`Projeto ${projectId}`}
-          backTo={`/projeto/${projectId}`}
+          onBack={goBack}
         />
 
         {/* Part A - Select expenses */}
@@ -82,46 +102,71 @@ const PersonnelDeclarationEditor = () => {
             <CardTitle className="text-base">Despesas da Rubrica de Pessoal</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-6 w-10"></TableHead>
-                  <TableHead>Conta/Tipo</TableHead>
-                  <TableHead>Competência</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Documento</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {personnelExpenses.map((exp) => (
-                  <TableRow key={exp.id}>
-                    <TableCell className="pl-6">
-                      <Checkbox
-                        checked={selectedExpenses.has(exp.id)}
-                        onCheckedChange={() => toggleExpense(exp.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{exp.item}</TableCell>
-                    <TableCell>{exp.competence || '—'}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(exp.value)}</TableCell>
-                    <TableCell>
-                      {exp.documentUrl ? (
-                        <Badge variant="outline" className="text-xs">Anexado</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+            <TooltipProvider>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-6 w-10"></TableHead>
+                    <TableHead>Conta/Tipo</TableHead>
+                    <TableHead>Competência</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Documento</TableHead>
+                    <TableHead>Situação</TableHead>
                   </TableRow>
-                ))}
-                {personnelExpenses.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                      Nenhuma despesa de pessoal cadastrada.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {personnelExpenses.map((exp) => {
+                    const usedIn = usedInOtherDeclarations.get(exp.id);
+                    const isUsed = !!usedIn;
+                    return (
+                      <TableRow key={exp.id} className={isUsed ? 'opacity-50' : ''}>
+                        <TableCell className="pl-6">
+                          <Checkbox
+                            checked={selectedExpenses.has(exp.id)}
+                            onCheckedChange={() => toggleExpense(exp.id)}
+                            disabled={isUsed}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{exp.item}</TableCell>
+                        <TableCell>{exp.competence || '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(exp.value)}</TableCell>
+                        <TableCell>
+                          {exp.documentUrl ? (
+                            <Badge variant="outline" className="text-xs">Anexado</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isUsed ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="text-[10px] cursor-help">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Já utilizada
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Utilizada em: {usedIn}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Disponível</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {personnelExpenses.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        Nenhuma despesa de pessoal cadastrada.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
             <div className="p-4 border-t flex justify-end">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total consolidado: </span>
@@ -173,8 +218,23 @@ const PersonnelDeclarationEditor = () => {
                   <TableRow key={member.id}>
                     <TableCell className="pl-6 font-medium">{member.name}</TableCell>
                     <TableCell className="text-muted-foreground">{member.role}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{member.workHours}h</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(member.value)}</TableCell>
+                    <TableCell className="text-right">
+                      <Input
+                        type="number"
+                        value={member.workHours}
+                        onChange={(e) => updateTeamMember(member.id, 'workHours', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-sm text-right w-24 ml-auto"
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={member.value}
+                        onChange={(e) => updateTeamMember(member.id, 'value', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-sm text-right w-32 ml-auto"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeTeamMember(member.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
@@ -202,7 +262,7 @@ const PersonnelDeclarationEditor = () => {
 
         {/* Footer actions */}
         <div className="flex items-center justify-end gap-3 pb-8">
-          <Button variant="outline" onClick={() => { toast.success('Rascunho salvo!'); navigate(`/projeto/${projectId}`); }}>
+          <Button variant="outline" onClick={() => { toast.success('Rascunho salvo!'); goBack(); }}>
             <Save className="h-4 w-4 mr-2" />
             Salvar rascunho
           </Button>

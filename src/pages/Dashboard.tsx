@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { projects, portfolioOptions, entityOptions, statusLabels, ProjectStatus, approvalStatusLabels, ApprovalStatus } from '@/data/mockData';
 import { useAuth, roleLabels } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
-import { StatusBadge } from '@/components/StatusBadge';
 import { DonutChart } from '@/components/DonutChart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
@@ -120,9 +119,8 @@ const Dashboard = () => {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-6">Projeto</TableHead>
+                   <TableHead className="pl-6">Projeto</TableHead>
                   <TableHead>Entidade</TableHead>
-                  <TableHead>Status da PC</TableHead>
                   <TableHead>Aprovação</TableHead>
                   <TableHead>Data limite</TableHead>
                 </TableRow>
@@ -142,18 +140,25 @@ const Dashboard = () => {
                       </div>
                     </TableCell>
                     <TableCell><span className="text-sm text-foreground">{project.entity}</span></TableCell>
-                    <TableCell><StatusBadge status={project.status} /></TableCell>
                     <TableCell>
                       <Badge variant={approvalBadgeVariant(project.approvalStatus)} className="text-xs">
                         {approvalStatusLabels[project.approvalStatus]}
                       </Badge>
                     </TableCell>
-                    <TableCell><span className="text-sm tabular-nums text-foreground">{formatDate(project.deadline)}</span></TableCell>
+                    <TableCell>
+                      <span className={`text-sm tabular-nums font-medium ${
+                        project.status === 'em_atraso' ? 'text-destructive' : 
+                        project.status === 'prazo_proximo' ? 'text-warning' : 'text-foreground'
+                      }`}>
+                        {formatDate(project.deadline)}
+                        {project.status === 'em_atraso' && ' ⚠'}
+                      </span>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                       Nenhum projeto encontrado com os filtros selecionados.
                     </TableCell>
                   </TableRow>

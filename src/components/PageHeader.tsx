@@ -7,20 +7,23 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   backTo?: string;
+  onBack?: () => void;
   actions?: ReactNode;
 }
 
-export const PageHeader = ({ title, subtitle, backTo, actions }: PageHeaderProps) => {
+export const PageHeader = ({ title, subtitle, backTo, onBack, actions }: PageHeaderProps) => {
   const navigate = useNavigate();
+
+  const handleBack = onBack || (backTo ? () => navigate(backTo) : undefined);
 
   return (
     <div className="flex items-start justify-between mb-8">
       <div className="flex items-start gap-3">
-        {backTo && (
+        {handleBack && (
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(backTo)}
+            onClick={handleBack}
             className="mt-0.5 shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />

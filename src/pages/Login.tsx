@@ -47,14 +47,6 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 p-3 rounded-lg bg-muted">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Contas de demonstração:</p>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p><span className="font-mono">maria@fiea.org.br</span> — Gerente de Projeto</p>
-              <p><span className="font-mono">ana@fiea.org.br</span> — Gerente do Escritório</p>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1.5 italic">Qualquer senha funciona</p>
-          </div>
         </CardContent>
       </Card>
     </div>
