@@ -105,12 +105,6 @@ const PCSchedule = () => {
                       <div className="flex items-center gap-3 mb-2">
                         <Calendar className="h-4 w-4 text-primary" />
                         <h3 className="font-semibold text-foreground">{stage.name}</h3>
-                        <Badge
-                          variant={stage.status === 'concluida' ? 'default' : stage.status === 'em_andamento' ? 'outline' : 'secondary'}
-                          className="text-xs"
-                        >
-                          {pcStageStatusLabels[stage.status]}
-                        </Badge>
                       </div>
 
                       {/* Forecast & progress */}

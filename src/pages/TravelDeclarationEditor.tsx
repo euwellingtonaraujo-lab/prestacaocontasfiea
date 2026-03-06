@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { expenses, travelDeclarations, formatCurrency, formatDate, Traveler } from '@/data/mockData';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 const TravelDeclarationEditor = () => {
   const { projectId, declarationId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isNew = declarationId === 'nova';
 
   const existing = travelDeclarations.find((d) => d.id === declarationId);
@@ -76,7 +77,15 @@ const TravelDeclarationEditor = () => {
     setTravelers((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const goBack = () => navigate(-1);
+  const goBack = () => {
+    const returnTab = searchParams.get('returnTab');
+    const stageId = searchParams.get('stageId');
+    if (stageId) {
+      navigate(`/projeto/${projectId}/pc/${stageId}${returnTab ? `?tab=${returnTab}` : ''}`);
+    } else {
+      navigate(-1);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -201,7 +210,6 @@ const TravelDeclarationEditor = () => {
                     <TableHead>Categoria</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Documento</TableHead>
                     <TableHead>Situação</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -227,13 +235,6 @@ const TravelDeclarationEditor = () => {
                         <TableCell className="tabular-nums">{formatDate(exp.acquisitionDate)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(exp.value)}</TableCell>
                         <TableCell>
-                          {exp.documentUrl ? (
-                            <Badge variant="outline" className="text-xs">Anexado</Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
                           {isUsed ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -255,7 +256,7 @@ const TravelDeclarationEditor = () => {
                   })}
                   {travelExpenses.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                         Nenhuma despesa de viagem cadastrada.
                       </TableCell>
                     </TableRow>

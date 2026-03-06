@@ -147,11 +147,12 @@ const Dashboard = () => {
                     </TableCell>
                     <TableCell>
                       <span className={`text-sm tabular-nums font-medium ${
+                        project.approvalStatus === 'aprovada' ? 'text-foreground' :
                         project.status === 'em_atraso' ? 'text-destructive' : 
                         project.status === 'prazo_proximo' ? 'text-warning' : 'text-foreground'
                       }`}>
                         {formatDate(project.deadline)}
-                        {project.status === 'em_atraso' && ' ⚠'}
+                        {project.approvalStatus !== 'aprovada' && project.status === 'em_atraso' && ' ⚠'}
                       </span>
                     </TableCell>
                   </TableRow>
