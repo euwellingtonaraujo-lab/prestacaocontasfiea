@@ -268,14 +268,6 @@ const ProjectDetail = () => {
               <span className="text-sm font-semibold text-foreground">{updatedStage.name}</span>
             </div>
             <PCProgressBar stage={updatedStage} total={stageTotal} />
-            {isInProgress && (
-              <div className="mt-3 flex justify-end">
-                <Button size="sm" onClick={handleConcludePC}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Concluir PC
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
 
