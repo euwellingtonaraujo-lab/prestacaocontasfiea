@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts, pcScheduleStages, PCScheduleStage, pcStageStatusLabels } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
@@ -25,7 +25,10 @@ const ProjectDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const project = projects.find((p) => p.id === projectId);
-  const [tab, setTab] = useState<ExpenseTab>('nf');
+  // Preserve tab from URL search params
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as ExpenseTab) || 'nf';
+  const [tab, setTab] = useState<ExpenseTab>(initialTab);
   const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(project?.approvalStatus || 'em_elaboracao');
   const [approvalComment, setApprovalComment] = useState('');
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
@@ -263,12 +266,6 @@ const ProjectDetail = () => {
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="h-4 w-4 text-primary" />
               <span className="text-sm font-semibold text-foreground">{updatedStage.name}</span>
-              <Badge
-                variant={updatedStage.status === 'concluida' ? 'default' : 'outline'}
-                className="text-xs"
-              >
-                {pcStageStatusLabels[updatedStage.status]}
-              </Badge>
             </div>
             <PCProgressBar stage={updatedStage} total={stageTotal} />
             {isInProgress && (
@@ -351,10 +348,6 @@ const ProjectDetail = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Status */}
-        <div className="mb-6">
-          <StatusBadge status={project.status} />
-        </div>
 
         {/* Tab selector */}
         <div className="mb-6">
@@ -388,8 +381,8 @@ const ProjectDetail = () => {
           <TravelSection
             declarations={projectTravelDecl}
             projectId={projectId!}
-            onEdit={(id) => navigate(`/projeto/${projectId}/viagem/${id}`)}
-            onCreate={() => navigate(`/projeto/${projectId}/viagem/nova`)}
+            onEdit={(id) => navigate(`/projeto/${projectId}/viagem/${id}?returnTab=viagem&stageId=${stageId}`)}
+            onCreate={() => navigate(`/projeto/${projectId}/viagem/nova?returnTab=viagem&stageId=${stageId}`)}
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedTravelDeclIds}
             onToggleInStage={toggleTravelDeclInStage}
@@ -400,8 +393,8 @@ const ProjectDetail = () => {
           <PersonnelSection
             declarations={projectPersonnelDecl}
             projectId={projectId!}
-            onEdit={(id) => navigate(`/projeto/${projectId}/pessoal/${id}`)}
-            onCreate={() => navigate(`/projeto/${projectId}/pessoal/nova`)}
+            onEdit={(id) => navigate(`/projeto/${projectId}/pessoal/${id}?returnTab=pessoal&stageId=${stageId}`)}
+            onCreate={() => navigate(`/projeto/${projectId}/pessoal/nova?returnTab=pessoal&stageId=${stageId}`)}
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedPersonnelDeclIds}
             onToggleInStage={togglePersonnelDeclInStage}
