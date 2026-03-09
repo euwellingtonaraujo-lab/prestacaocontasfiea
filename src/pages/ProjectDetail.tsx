@@ -354,7 +354,7 @@ const ProjectDetail = () => {
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedExpenseIds}
             onToggleInStage={toggleExpenseInStage}
-            showCheckboxes={isInProgress}
+            showCheckboxes={showCheckboxes}
           />
         )}
         {tab === 'viagem' && (
@@ -366,7 +366,7 @@ const ProjectDetail = () => {
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedTravelDeclIds}
             onToggleInStage={toggleTravelDeclInStage}
-            showCheckboxes={isInProgress}
+            showCheckboxes={showCheckboxes}
           />
         )}
         {tab === 'pessoal' && (
@@ -378,7 +378,7 @@ const ProjectDetail = () => {
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedPersonnelDeclIds}
             onToggleInStage={togglePersonnelDeclInStage}
-            showCheckboxes={isInProgress}
+            showCheckboxes={showCheckboxes}
           />
         )}
 

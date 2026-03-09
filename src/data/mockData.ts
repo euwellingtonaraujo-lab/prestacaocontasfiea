@@ -210,12 +210,12 @@ export const personnelDeclarations: PersonnelDeclaration[] = [
 ];
 
 export const pcScheduleStages: PCScheduleStage[] = [
-  { id: 'pc1', projectId: '1', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 35000.00, selectedExpenseIds: ['e1', 'e2', 'e3'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc2', projectId: '1', name: 'PC2 — 2º Trimestre', status: 'em_andamento', forecastValue: 80000.00, selectedExpenseIds: ['e10'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc1', projectId: '1', name: 'PC1 — 1º Trimestre', status: 'aprovada', forecastValue: 35000.00, selectedExpenseIds: ['e1', 'e2', 'e3'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc2', projectId: '1', name: 'PC2 — 2º Trimestre', status: 'em_elaboracao', forecastValue: 80000.00, selectedExpenseIds: ['e10'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
   { id: 'pc3', projectId: '2', name: 'PC1 — 1º Trimestre', status: 'nao_iniciada', forecastValue: 50000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc4', projectId: '3', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 40000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc5', projectId: '4', name: 'PC1 — 1º Trimestre', status: 'em_andamento', forecastValue: 60000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc6', projectId: '5', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 45000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc4', projectId: '3', name: 'PC1 — 1º Trimestre', status: 'submetida', forecastValue: 40000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc5', projectId: '4', name: 'PC1 — 1º Trimestre', status: 'ajustes_solicitados', forecastValue: 60000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc6', projectId: '5', name: 'PC1 — 1º Trimestre', status: 'aprovada', forecastValue: 45000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
   { id: 'pc7', projectId: '6', name: 'PC1 — 1º Trimestre', status: 'nao_iniciada', forecastValue: 70000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
 ];
 
