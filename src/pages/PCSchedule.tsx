@@ -162,10 +162,16 @@ const PCSchedule = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {stage.status === 'concluida' && (
+                      {stage.status === 'concluida' && project.approvalStatus === 'aprovada' && (
                         <Button variant="outline" size="sm" onClick={() => handleViewPC(stage.id)}>
                           <Eye className="h-4 w-4 mr-2" />
                           Visualizar PC
+                        </Button>
+                      )}
+                      {stage.status === 'concluida' && project.approvalStatus !== 'aprovada' && (
+                        <Button size="sm" onClick={() => handleContinuePC(stage.id)}>
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Editar PC
                         </Button>
                       )}
                       {stage.status === 'nao_iniciada' && (
