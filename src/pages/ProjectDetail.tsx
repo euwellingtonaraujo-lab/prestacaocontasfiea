@@ -264,26 +264,26 @@ const ProjectDetail = () => {
           <CardContent className="py-4 px-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Aprovação:</p>
-                <Badge variant={approvalStatus === 'aprovada' ? 'default' : approvalStatus === 'ajustes_solicitados' ? 'destructive' : 'secondary'} className="text-xs">
-                  {approvalStatusLabels[approvalStatus]}
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status da PC:</p>
+                <Badge variant={stageStatus === 'aprovada' ? 'default' : stageStatus === 'ajustes_solicitados' ? 'destructive' : 'secondary'} className="text-xs">
+                  {pcStageStatusLabels[stageStatus]}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                {isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados') && (
+                {isGP && stageStatus === 'em_elaboracao' && (
                   <Button size="sm" onClick={() => openApprovalDialog('submetida')}>
                     <Send className="h-4 w-4 mr-2" />
                     Submeter para aprovação
                   </Button>
                 )}
-                {isPMO && (approvalStatus === 'submetida' || approvalStatus === 'em_analise') && (
+                {isGP && stageStatus === 'ajustes_solicitados' && (
+                  <Button size="sm" onClick={() => openApprovalDialog('submetida')}>
+                    <Send className="h-4 w-4 mr-2" />
+                    Reenviar para aprovação
+                  </Button>
+                )}
+                {isPMO && stageStatus === 'submetida' && (
                   <>
-                    {approvalStatus === 'submetida' && (
-                      <Button variant="outline" size="sm" onClick={() => { setApprovalStatus('em_analise'); toast.info('Status: Em análise'); }}>
-                        <AlertCircle className="h-4 w-4 mr-2" />
-                        Iniciar análise
-                      </Button>
-                    )}
                     <Button variant="outline" size="sm" className="text-destructive" onClick={() => openApprovalDialog('ajustes_solicitados')}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Solicitar ajustes
@@ -296,10 +296,10 @@ const ProjectDetail = () => {
                 )}
               </div>
             </div>
-            {!canEdit && isGP && approvalStatus !== 'em_elaboracao' && approvalStatus !== 'ajustes_solicitados' && (
+            {isGP && (stageStatus === 'submetida' || stageStatus === 'aprovada') && (
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <Lock className="h-3 w-3" />
-                Edição bloqueada — a PC foi submetida para aprovação.
+                {stageStatus === 'submetida' ? 'Edição bloqueada — a PC foi submetida para aprovação.' : 'PC aprovada — somente visualização.'}
               </p>
             )}
           </CardContent>
