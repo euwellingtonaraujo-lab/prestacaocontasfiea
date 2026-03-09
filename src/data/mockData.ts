@@ -1,11 +1,10 @@
 export type ProjectStatus = 'em_andamento' | 'em_atraso' | 'prazo_proximo';
 
-export type ApprovalStatus = 'em_elaboracao' | 'submetida' | 'em_analise' | 'ajustes_solicitados' | 'aprovada';
+export type ApprovalStatus = 'em_elaboracao' | 'submetida' | 'ajustes_solicitados' | 'aprovada';
 
 export const approvalStatusLabels: Record<ApprovalStatus, string> = {
   em_elaboracao: 'Em elaboração',
   submetida: 'Submetida para aprovação',
-  em_analise: 'Em análise (PMO)',
   ajustes_solicitados: 'Ajustes solicitados',
   aprovada: 'Aprovada',
 };
@@ -13,7 +12,6 @@ export const approvalStatusLabels: Record<ApprovalStatus, string> = {
 export const approvalStatusColors: Record<ApprovalStatus, string> = {
   em_elaboracao: 'bg-muted text-muted-foreground',
   submetida: 'bg-info/15 text-info',
-  em_analise: 'bg-warning/15 text-warning-foreground',
   ajustes_solicitados: 'bg-destructive/15 text-destructive',
   aprovada: 'bg-success/15 text-success',
 };
