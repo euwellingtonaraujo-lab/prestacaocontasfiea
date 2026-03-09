@@ -134,12 +134,14 @@ export interface ExpenseDiscount {
   description: string;
 }
 
-export type PCStageStatus = 'nao_iniciada' | 'em_andamento' | 'concluida';
+export type PCStageStatus = 'nao_iniciada' | 'em_elaboracao' | 'submetida' | 'ajustes_solicitados' | 'aprovada';
 
 export const pcStageStatusLabels: Record<PCStageStatus, string> = {
   nao_iniciada: 'Não iniciada',
-  em_andamento: 'Em andamento',
-  concluida: 'Concluída',
+  em_elaboracao: 'Em elaboração',
+  submetida: 'Submetida para aprovação',
+  ajustes_solicitados: 'Ajustes solicitados',
+  aprovada: 'Aprovada',
 };
 
 export interface PCScheduleStage {
