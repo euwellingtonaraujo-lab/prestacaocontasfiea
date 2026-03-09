@@ -1,11 +1,10 @@
 export type ProjectStatus = 'em_andamento' | 'em_atraso' | 'prazo_proximo';
 
-export type ApprovalStatus = 'em_elaboracao' | 'submetida' | 'em_analise' | 'ajustes_solicitados' | 'aprovada';
+export type ApprovalStatus = 'em_elaboracao' | 'submetida' | 'ajustes_solicitados' | 'aprovada';
 
 export const approvalStatusLabels: Record<ApprovalStatus, string> = {
   em_elaboracao: 'Em elaboração',
   submetida: 'Submetida para aprovação',
-  em_analise: 'Em análise (PMO)',
   ajustes_solicitados: 'Ajustes solicitados',
   aprovada: 'Aprovada',
 };
@@ -13,7 +12,6 @@ export const approvalStatusLabels: Record<ApprovalStatus, string> = {
 export const approvalStatusColors: Record<ApprovalStatus, string> = {
   em_elaboracao: 'bg-muted text-muted-foreground',
   submetida: 'bg-info/15 text-info',
-  em_analise: 'bg-warning/15 text-warning-foreground',
   ajustes_solicitados: 'bg-destructive/15 text-destructive',
   aprovada: 'bg-success/15 text-success',
 };
@@ -136,12 +134,14 @@ export interface ExpenseDiscount {
   description: string;
 }
 
-export type PCStageStatus = 'nao_iniciada' | 'em_andamento' | 'concluida';
+export type PCStageStatus = 'nao_iniciada' | 'em_elaboracao' | 'submetida' | 'ajustes_solicitados' | 'aprovada';
 
 export const pcStageStatusLabels: Record<PCStageStatus, string> = {
   nao_iniciada: 'Não iniciada',
-  em_andamento: 'Em andamento',
-  concluida: 'Concluída',
+  em_elaboracao: 'Em elaboração',
+  submetida: 'Submetida para aprovação',
+  ajustes_solicitados: 'Ajustes solicitados',
+  aprovada: 'Aprovada',
 };
 
 export interface PCScheduleStage {
@@ -174,8 +174,8 @@ export const projects: Project[] = [
   { id: '1', code: 'PRJ-2024-001', name: 'Modernização Tecnológica — Unidade Benedito', entity: 'Sesi', portfolio: 'Carteira 1', status: 'em_andamento', approvalStatus: 'em_elaboracao', deadline: '2025-04-15', approvalHistory: [] },
   { id: '2', code: 'PRJ-2024-002', name: 'Capacitação Profissional em Soldagem', entity: 'Senai', portfolio: 'Carteira 2', status: 'em_atraso', approvalStatus: 'em_elaboracao', deadline: '2025-03-01', approvalHistory: [] },
   { id: '3', code: 'PRJ-2024-003', name: 'Infraestrutura de Conectividade Industrial', entity: 'Senai', portfolio: 'Carteira 1', status: 'prazo_proximo', approvalStatus: 'submetida', deadline: '2025-03-10', approvalHistory: [{ id: 'ah3', date: '2025-03-05 09:00', user: 'Carlos Lima', fromStatus: 'em_elaboracao', toStatus: 'submetida', comment: 'PC1 finalizada para revisão' }] },
-  { id: '4', code: 'PRJ-2024-004', name: 'Programa de Saúde e Segurança do Trabalho', entity: 'Sesi', portfolio: 'Carteira 2', status: 'em_andamento', approvalStatus: 'ajustes_solicitados', deadline: '2025-06-30', approvalHistory: [{ id: 'ah2', date: '2025-02-20 14:00', user: 'Ana Costa', fromStatus: 'em_analise', toStatus: 'ajustes_solicitados', comment: 'Faltam comprovantes de 3 despesas' }] },
-  { id: '5', code: 'PRJ-2024-005', name: 'Laboratório de Automação e Robótica', entity: 'Senai', portfolio: 'Carteira 1', status: 'em_andamento', approvalStatus: 'aprovada', deadline: '2025-06-30', approvalHistory: [{ id: 'ah5', date: '2025-02-15 16:00', user: 'Ana Costa', fromStatus: 'em_analise', toStatus: 'aprovada', comment: 'Tudo em ordem' }] },
+  { id: '4', code: 'PRJ-2024-004', name: 'Programa de Saúde e Segurança do Trabalho', entity: 'Sesi', portfolio: 'Carteira 2', status: 'em_andamento', approvalStatus: 'ajustes_solicitados', deadline: '2025-06-30', approvalHistory: [{ id: 'ah2', date: '2025-02-20 14:00', user: 'Ana Costa', fromStatus: 'submetida', toStatus: 'ajustes_solicitados', comment: 'Faltam comprovantes de 3 despesas' }] },
+  { id: '5', code: 'PRJ-2024-005', name: 'Laboratório de Automação e Robótica', entity: 'Senai', portfolio: 'Carteira 1', status: 'em_andamento', approvalStatus: 'aprovada', deadline: '2025-06-30', approvalHistory: [{ id: 'ah5', date: '2025-02-15 16:00', user: 'Ana Costa', fromStatus: 'submetida', toStatus: 'aprovada', comment: 'Tudo em ordem' }] },
   { id: '6', code: 'PRJ-2024-006', name: 'Centro de Inovação Digital', entity: 'Corporativo', portfolio: 'Carteira 2', status: 'prazo_proximo', approvalStatus: 'em_elaboracao', deadline: '2025-03-15', approvalHistory: [] },
 ];
 
@@ -210,12 +210,12 @@ export const personnelDeclarations: PersonnelDeclaration[] = [
 ];
 
 export const pcScheduleStages: PCScheduleStage[] = [
-  { id: 'pc1', projectId: '1', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 35000.00, selectedExpenseIds: ['e1', 'e2', 'e3'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc2', projectId: '1', name: 'PC2 — 2º Trimestre', status: 'em_andamento', forecastValue: 80000.00, selectedExpenseIds: ['e10'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc1', projectId: '1', name: 'PC1 — 1º Trimestre', status: 'aprovada', forecastValue: 35000.00, selectedExpenseIds: ['e1', 'e2', 'e3'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc2', projectId: '1', name: 'PC2 — 2º Trimestre', status: 'em_elaboracao', forecastValue: 80000.00, selectedExpenseIds: ['e10'], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
   { id: 'pc3', projectId: '2', name: 'PC1 — 1º Trimestre', status: 'nao_iniciada', forecastValue: 50000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc4', projectId: '3', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 40000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc5', projectId: '4', name: 'PC1 — 1º Trimestre', status: 'em_andamento', forecastValue: 60000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
-  { id: 'pc6', projectId: '5', name: 'PC1 — 1º Trimestre', status: 'concluida', forecastValue: 45000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc4', projectId: '3', name: 'PC1 — 1º Trimestre', status: 'submetida', forecastValue: 40000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc5', projectId: '4', name: 'PC1 — 1º Trimestre', status: 'ajustes_solicitados', forecastValue: 60000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
+  { id: 'pc6', projectId: '5', name: 'PC1 — 1º Trimestre', status: 'aprovada', forecastValue: 45000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
   { id: 'pc7', projectId: '6', name: 'PC1 — 1º Trimestre', status: 'nao_iniciada', forecastValue: 70000.00, selectedExpenseIds: [], selectedTravelDeclIds: [], selectedPersonnelDeclIds: [] },
 ];
 

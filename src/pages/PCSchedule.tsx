@@ -1,31 +1,38 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projects, pcScheduleStages, PCScheduleStage, pcStageStatusLabels, formatCurrency } from '@/data/mockData';
+import { projects, pcScheduleStages, PCScheduleStage, PCStageStatus, pcStageStatusLabels, formatCurrency, approvalStatusColors } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, Play, Eye, ArrowRight, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Calendar, Play, Eye, ArrowRight, CheckCircle, AlertTriangle, Lock, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { expenses as allExpenses, travelDeclarations, personnelDeclarations } from '@/data/mockData';
+
+const ACTIVE_STATUSES: PCStageStatus[] = ['em_elaboracao', 'submetida', 'ajustes_solicitados'];
 
 const PCSchedule = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const project = projects.find((p) => p.id === projectId);
   const [stages, setStages] = useState<PCScheduleStage[]>(pcScheduleStages);
   const [editForecastId, setEditForecastId] = useState<string | null>(null);
   const [forecastInput, setForecastInput] = useState('');
+
+  const isGP = user?.role === 'gp';
+  const isPMO = user?.role === 'escritorio';
 
   const projectStages = useMemo(
     () => stages.filter((s) => s.projectId === projectId),
     [stages, projectId]
   );
 
-  // Check if there's an in-progress stage
-  const hasInProgress = projectStages.some(s => s.status === 'em_andamento');
+  // Check if there's an active PC (em_elaboracao, submetida, or ajustes_solicitados)
+  const activeStage = projectStages.find(s => ACTIVE_STATUSES.includes(s.status));
 
   if (!project) {
     return (
@@ -52,21 +59,22 @@ const PCSchedule = () => {
     return expTotal + travelTotal + persTotal;
   };
 
+  const canStartStage = (stage: PCScheduleStage, index: number): boolean => {
+    if (stage.status !== 'nao_iniciada') return false;
+    if (activeStage) return false;
+    // Check previous stage is approved (or it's the first stage)
+    if (index === 0) return true;
+    const prevStage = projectStages[index - 1];
+    return prevStage?.status === 'aprovada';
+  };
+
   const handleStartPC = (stageId: string) => {
-    if (hasInProgress) {
-      toast.error('Finalize a PC em andamento antes de iniciar uma nova.');
-      return;
-    }
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'em_andamento' } : s));
+    setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'em_elaboracao' as PCStageStatus } : s));
     toast.success('PC iniciada!');
     navigate(`/projeto/${projectId}/pc/${stageId}`);
   };
 
-  const handleContinuePC = (stageId: string) => {
-    navigate(`/projeto/${projectId}/pc/${stageId}`);
-  };
-
-  const handleViewPC = (stageId: string) => {
+  const handleOpenPC = (stageId: string) => {
     navigate(`/projeto/${projectId}/pc/${stageId}`);
   };
 
@@ -79,6 +87,64 @@ const PCSchedule = () => {
     setEditForecastId(null);
   };
 
+  const renderStageActions = (stage: PCScheduleStage, index: number) => {
+    const status = stage.status;
+
+    // PMO: superuser — always can open/edit any created PC
+    if (isPMO) {
+      if (status === 'nao_iniciada') {
+        const allowed = canStartStage(stage, index);
+        return (
+          <Button size="sm" onClick={() => handleStartPC(stage.id)} disabled={!allowed}>
+            <Play className="h-4 w-4 mr-2" />
+            Iniciar PC
+          </Button>
+        );
+      }
+      // Any other status: PMO can always open/edit
+      return (
+        <Button size="sm" onClick={() => handleOpenPC(stage.id)}>
+          <Pencil className="h-4 w-4 mr-2" />
+          Abrir PC
+        </Button>
+      );
+    }
+
+    // GP logic
+    if (status === 'nao_iniciada') {
+      const allowed = canStartStage(stage, index);
+      if (!allowed) return null; // No button shown, blocked
+      return (
+        <Button size="sm" onClick={() => handleStartPC(stage.id)}>
+          <Play className="h-4 w-4 mr-2" />
+          Iniciar PC
+        </Button>
+      );
+    }
+
+    if (status === 'em_elaboracao' || status === 'ajustes_solicitados') {
+      // If this is NOT the active stage (shouldn't happen, but safety)
+      if (activeStage && activeStage.id !== stage.id) return null;
+      return (
+        <Button size="sm" onClick={() => handleOpenPC(stage.id)}>
+          <ArrowRight className="h-4 w-4 mr-2" />
+          Continuar PC
+        </Button>
+      );
+    }
+
+    if (status === 'submetida' || status === 'aprovada') {
+      return (
+        <Button variant="outline" size="sm" onClick={() => handleOpenPC(stage.id)}>
+          <Eye className="h-4 w-4 mr-2" />
+          Visualizar PC
+        </Button>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -88,23 +154,39 @@ const PCSchedule = () => {
           backTo="/"
         />
 
+        {/* Active PC warning */}
+        {activeStage && (
+          <Card className="mb-4 border-warning/30 bg-warning/5">
+            <CardContent className="py-3 px-4 flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <span className="text-muted-foreground">
+                Existe uma prestação de contas ativa ({activeStage.name} — {pcStageStatusLabels[activeStage.status]}). 
+                Finalize/avance a etapa atual para prosseguir com outras.
+              </span>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stages list */}
         <div className="grid gap-4 mb-8">
-          {projectStages.map((stage) => {
+          {projectStages.map((stage, index) => {
             const total = getStageTotal(stage);
             const pct = stage.forecastValue > 0 ? Math.min((total / stage.forecastValue) * 100, 999) : 0;
             const faltante = Math.max(0, stage.forecastValue - total);
             const excedente = Math.max(0, total - stage.forecastValue);
-            const canStart = !hasInProgress && stage.status === 'nao_iniciada';
+            const isBlocked = stage.status === 'nao_iniciada' && !canStartStage(stage, index);
 
             return (
-              <Card key={stage.id} className="animate-fade-in">
+              <Card key={stage.id} className={`animate-fade-in ${isBlocked ? 'opacity-60' : ''}`}>
                 <CardContent className="py-5 px-6">
                   <div className="flex items-start justify-between flex-wrap gap-4">
                     <div className="flex-1 min-w-[240px]">
                       <div className="flex items-center gap-3 mb-2">
                         <Calendar className="h-4 w-4 text-primary" />
                         <h3 className="font-semibold text-foreground">{stage.name}</h3>
+                        <Badge variant="outline" className={`text-xs ${approvalStatusColors[stage.status] || 'bg-muted text-muted-foreground'}`}>
+                          {pcStageStatusLabels[stage.status]}
+                        </Badge>
                       </div>
 
                       {/* Forecast & progress */}
@@ -159,33 +241,20 @@ const PCSchedule = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Blocked message for GP */}
+                      {isBlocked && isGP && (
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Lock className="h-3 w-3" />
+                          {activeStage
+                            ? 'Existe uma prestação de contas em andamento. Finalize/avance a etapa atual para prosseguir.'
+                            : 'A etapa anterior precisa estar aprovada para iniciar esta.'}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {stage.status === 'concluida' && project.approvalStatus === 'aprovada' && (
-                        <Button variant="outline" size="sm" onClick={() => handleViewPC(stage.id)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Visualizar PC
-                        </Button>
-                      )}
-                      {stage.status === 'concluida' && project.approvalStatus !== 'aprovada' && (
-                        <Button size="sm" onClick={() => handleContinuePC(stage.id)}>
-                          <ArrowRight className="h-4 w-4 mr-2" />
-                          Editar PC
-                        </Button>
-                      )}
-                      {stage.status === 'nao_iniciada' && (
-                        <Button size="sm" onClick={() => handleStartPC(stage.id)} disabled={!canStart}>
-                          <Play className="h-4 w-4 mr-2" />
-                          Iniciar PC
-                        </Button>
-                      )}
-                      {stage.status === 'em_andamento' && (
-                        <Button size="sm" onClick={() => handleContinuePC(stage.id)}>
-                          <ArrowRight className="h-4 w-4 mr-2" />
-                          Continuar PC
-                        </Button>
-                      )}
+                      {renderStageActions(stage, index)}
                     </div>
                   </div>
                 </CardContent>

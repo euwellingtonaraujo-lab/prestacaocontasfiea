@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts, pcScheduleStages, PCScheduleStage, pcStageStatusLabels } from '@/data/mockData';
+import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts, pcScheduleStages, PCScheduleStage, PCStageStatus, pcStageStatusLabels } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -29,17 +29,20 @@ const ProjectDetail = () => {
   const [searchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as ExpenseTab) || 'nf';
   const [tab, setTab] = useState<ExpenseTab>(initialTab);
-  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(project?.approvalStatus || 'em_elaboracao');
   const [approvalComment, setApprovalComment] = useState('');
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<ApprovalStatus | null>(null);
+  const [pendingAction, setPendingAction] = useState<PCStageStatus | null>(null);
   const [showNonPresentable, setShowNonPresentable] = useState(false);
   const [localExpenses, setLocalExpenses] = useState<Expense[]>(allExpenses);
   const [stages, setStages] = useState<PCScheduleStage[]>(pcScheduleStages);
 
   const currentStage = stages.find(s => s.id === stageId);
-  const isReadOnly = currentStage?.status === 'concluida';
-  const isInProgress = currentStage?.status === 'em_andamento';
+  const stageStatus: PCStageStatus = currentStage?.status || 'nao_iniciada';
+  const isGP = user?.role === 'gp';
+  const isPMO = user?.role === 'escritorio';
+  const canEdit = (isGP && (stageStatus === 'em_elaboracao' || stageStatus === 'ajustes_solicitados')) || isPMO;
+  const isReadOnly = !canEdit;
+  const showCheckboxes = canEdit;
 
   // IDs used in OTHER stages (not this one)
   const otherStageExpenseIds = useMemo(() => {
@@ -169,17 +172,6 @@ const ProjectDetail = () => {
     return expTotal + travelTotal + persTotal;
   };
 
-  const handleConcludePC = () => {
-    if (!currentStage) return;
-    const total = getStageTotal();
-    if (total < currentStage.forecastValue) {
-      toast.error(`O valor selecionado (${formatCurrency(total)}) ainda não atingiu o valor previsto (${formatCurrency(currentStage.forecastValue)}). Selecione mais itens.`);
-      return;
-    }
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'concluida' } : s));
-    toast.success('PC concluída com sucesso!');
-    navigate(`/projeto/${projectId}`);
-  };
 
   if (!project) {
     return (
@@ -198,16 +190,12 @@ const ProjectDetail = () => {
   }
 
   const handleExport = () => {
-    if (approvalStatus !== 'aprovada') {
+    if (stageStatus !== 'aprovada') {
       toast.error('A PC precisa estar aprovada para exportação final.');
       return;
     }
     toast.success('Planilha exportada com sucesso!');
   };
-
-  const isGP = user?.role === 'gp';
-  const isPMO = user?.role === 'escritorio';
-  const canEdit = isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados');
 
   const openApprovalDialog = (action: ApprovalStatus) => {
     setPendingAction(action);
@@ -217,8 +205,8 @@ const ProjectDetail = () => {
 
   const confirmApproval = () => {
     if (pendingAction) {
-      setApprovalStatus(pendingAction);
-      toast.success(`Status alterado para: ${approvalStatusLabels[pendingAction]}`);
+      setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: pendingAction } : s));
+      toast.success(`Status alterado para: ${pcStageStatusLabels[pendingAction]}`);
     }
     setApprovalDialogOpen(false);
   };
@@ -251,10 +239,10 @@ const ProjectDetail = () => {
           backTo={`/projeto/${projectId}`}
           actions={
             <>
-              <Button size="sm" onClick={handleExport} disabled={approvalStatus !== 'aprovada'}>
+              <Button size="sm" onClick={handleExport} disabled={stageStatus !== 'aprovada'}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar planilha
-                {approvalStatus !== 'aprovada' && <Lock className="h-3 w-3 ml-1" />}
+                {stageStatus !== 'aprovada' && <Lock className="h-3 w-3 ml-1" />}
               </Button>
             </>
           }
@@ -276,26 +264,26 @@ const ProjectDetail = () => {
           <CardContent className="py-4 px-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Aprovação:</p>
-                <Badge variant={approvalStatus === 'aprovada' ? 'default' : approvalStatus === 'ajustes_solicitados' ? 'destructive' : 'secondary'} className="text-xs">
-                  {approvalStatusLabels[approvalStatus]}
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status da PC:</p>
+                <Badge variant={stageStatus === 'aprovada' ? 'default' : stageStatus === 'ajustes_solicitados' ? 'destructive' : 'secondary'} className="text-xs">
+                  {pcStageStatusLabels[stageStatus]}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                {isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados') && (
+                {isGP && stageStatus === 'em_elaboracao' && (
                   <Button size="sm" onClick={() => openApprovalDialog('submetida')}>
                     <Send className="h-4 w-4 mr-2" />
                     Submeter para aprovação
                   </Button>
                 )}
-                {isPMO && (approvalStatus === 'submetida' || approvalStatus === 'em_analise') && (
+                {isGP && stageStatus === 'ajustes_solicitados' && (
+                  <Button size="sm" onClick={() => openApprovalDialog('submetida')}>
+                    <Send className="h-4 w-4 mr-2" />
+                    Reenviar para aprovação
+                  </Button>
+                )}
+                {isPMO && stageStatus === 'submetida' && (
                   <>
-                    {approvalStatus === 'submetida' && (
-                      <Button variant="outline" size="sm" onClick={() => { setApprovalStatus('em_analise'); toast.info('Status: Em análise'); }}>
-                        <AlertCircle className="h-4 w-4 mr-2" />
-                        Iniciar análise
-                      </Button>
-                    )}
                     <Button variant="outline" size="sm" className="text-destructive" onClick={() => openApprovalDialog('ajustes_solicitados')}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Solicitar ajustes
@@ -308,10 +296,10 @@ const ProjectDetail = () => {
                 )}
               </div>
             </div>
-            {!canEdit && isGP && approvalStatus !== 'em_elaboracao' && approvalStatus !== 'ajustes_solicitados' && (
+            {isGP && (stageStatus === 'submetida' || stageStatus === 'aprovada') && (
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <Lock className="h-3 w-3" />
-                Edição bloqueada — a PC foi submetida para aprovação.
+                {stageStatus === 'submetida' ? 'Edição bloqueada — a PC foi submetida para aprovação.' : 'PC aprovada — somente visualização.'}
               </p>
             )}
           </CardContent>
@@ -366,7 +354,7 @@ const ProjectDetail = () => {
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedExpenseIds}
             onToggleInStage={toggleExpenseInStage}
-            showCheckboxes={isInProgress}
+            showCheckboxes={showCheckboxes}
           />
         )}
         {tab === 'viagem' && (
@@ -378,7 +366,7 @@ const ProjectDetail = () => {
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedTravelDeclIds}
             onToggleInStage={toggleTravelDeclInStage}
-            showCheckboxes={isInProgress}
+            showCheckboxes={showCheckboxes}
           />
         )}
         {tab === 'pessoal' && (
@@ -390,7 +378,7 @@ const ProjectDetail = () => {
             readOnly={isReadOnly}
             stageSelectedIds={updatedStage.selectedPersonnelDeclIds}
             onToggleInStage={togglePersonnelDeclInStage}
-            showCheckboxes={isInProgress}
+            showCheckboxes={showCheckboxes}
           />
         )}
 
