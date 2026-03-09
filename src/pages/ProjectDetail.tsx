@@ -37,8 +37,12 @@ const ProjectDetail = () => {
   const [stages, setStages] = useState<PCScheduleStage[]>(pcScheduleStages);
 
   const currentStage = stages.find(s => s.id === stageId);
-  const isReadOnly = currentStage?.status === 'concluida';
-  const isInProgress = currentStage?.status === 'em_andamento';
+  const stageStatus: PCStageStatus = currentStage?.status || 'nao_iniciada';
+  const isGP = user?.role === 'gp';
+  const isPMO = user?.role === 'escritorio';
+  const canEdit = (isGP && (stageStatus === 'em_elaboracao' || stageStatus === 'ajustes_solicitados')) || isPMO;
+  const isReadOnly = !canEdit;
+  const showCheckboxes = canEdit;
 
   // IDs used in OTHER stages (not this one)
   const otherStageExpenseIds = useMemo(() => {
