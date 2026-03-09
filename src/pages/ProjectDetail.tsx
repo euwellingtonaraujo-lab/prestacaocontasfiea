@@ -239,10 +239,10 @@ const ProjectDetail = () => {
           backTo={`/projeto/${projectId}`}
           actions={
             <>
-              <Button size="sm" onClick={handleExport} disabled={approvalStatus !== 'aprovada'}>
+              <Button size="sm" onClick={handleExport} disabled={stageStatus !== 'aprovada'}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar planilha
-                {approvalStatus !== 'aprovada' && <Lock className="h-3 w-3 ml-1" />}
+                {stageStatus !== 'aprovada' && <Lock className="h-3 w-3 ml-1" />}
               </Button>
             </>
           }
