@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts, pcScheduleStages, PCScheduleStage, pcStageStatusLabels } from '@/data/mockData';
+import { projects, expenses as allExpenses, travelDeclarations, personnelDeclarations, rubricOptions, counterpartOptions, formatCurrency, formatDate, Expense, approvalStatusLabels, ApprovalStatus, expenseDiscounts, pcScheduleStages, PCScheduleStage, PCStageStatus, pcStageStatusLabels } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
