@@ -29,10 +29,9 @@ const ProjectDetail = () => {
   const [searchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as ExpenseTab) || 'nf';
   const [tab, setTab] = useState<ExpenseTab>(initialTab);
-  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(project?.approvalStatus || 'em_elaboracao');
   const [approvalComment, setApprovalComment] = useState('');
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<ApprovalStatus | null>(null);
+  const [pendingAction, setPendingAction] = useState<PCStageStatus | null>(null);
   const [showNonPresentable, setShowNonPresentable] = useState(false);
   const [localExpenses, setLocalExpenses] = useState<Expense[]>(allExpenses);
   const [stages, setStages] = useState<PCScheduleStage[]>(pcScheduleStages);
