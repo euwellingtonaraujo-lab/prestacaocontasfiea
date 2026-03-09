@@ -15,7 +15,7 @@ import { FileText, LogOut, Users, User } from 'lucide-react';
 const approvalBadgeVariant = (s: ApprovalStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
   if (s === 'aprovada') return 'default';
   if (s === 'ajustes_solicitados') return 'destructive';
-  if (s === 'submetida' || s === 'em_analise') return 'outline';
+  if (s === 'submetida') return 'outline';
   return 'secondary';
 };
 
