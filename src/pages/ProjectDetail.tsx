@@ -190,16 +190,12 @@ const ProjectDetail = () => {
   }
 
   const handleExport = () => {
-    if (approvalStatus !== 'aprovada') {
+    if (stageStatus !== 'aprovada') {
       toast.error('A PC precisa estar aprovada para exportação final.');
       return;
     }
     toast.success('Planilha exportada com sucesso!');
   };
-
-  const isGP = user?.role === 'gp';
-  const isPMO = user?.role === 'escritorio';
-  const canEdit = isGP && (approvalStatus === 'em_elaboracao' || approvalStatus === 'ajustes_solicitados');
 
   const openApprovalDialog = (action: ApprovalStatus) => {
     setPendingAction(action);
