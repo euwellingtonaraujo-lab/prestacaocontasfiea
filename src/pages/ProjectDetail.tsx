@@ -172,17 +172,6 @@ const ProjectDetail = () => {
     return expTotal + travelTotal + persTotal;
   };
 
-  const handleConcludePC = () => {
-    if (!currentStage) return;
-    const total = getStageTotal();
-    if (total < currentStage.forecastValue) {
-      toast.error(`O valor selecionado (${formatCurrency(total)}) ainda não atingiu o valor previsto (${formatCurrency(currentStage.forecastValue)}). Selecione mais itens.`);
-      return;
-    }
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: 'concluida' } : s));
-    toast.success('PC concluída com sucesso!');
-    navigate(`/projeto/${projectId}`);
-  };
 
   if (!project) {
     return (
