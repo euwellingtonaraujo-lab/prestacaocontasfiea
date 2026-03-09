@@ -205,8 +205,8 @@ const ProjectDetail = () => {
 
   const confirmApproval = () => {
     if (pendingAction) {
-      setApprovalStatus(pendingAction);
-      toast.success(`Status alterado para: ${approvalStatusLabels[pendingAction]}`);
+      setStages(prev => prev.map(s => s.id === stageId ? { ...s, status: pendingAction } : s));
+      toast.success(`Status alterado para: ${pcStageStatusLabels[pendingAction]}`);
     }
     setApprovalDialogOpen(false);
   };
